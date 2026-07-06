@@ -926,6 +926,287 @@ class TestMCPAgent:
 
 
 # ============================================================================
+# 阶段 5 — Skill 设计与路由测试（无需 API Key）
+# ============================================================================
+
+class TestSkillBase:
+    """测试 Skill 抽象基类。"""
+
+    def test_skill_abstract_cannot_instantiate(self):
+        """抽象基类不能直接实例化。"""
+        import pytest
+        from skills.base import Skill
+        with pytest.raises(TypeError):
+            Skill(name="test", description="test", trigger_keywords=["test"])
+
+    def test_concrete_skill_instantiation(self):
+        """具体 Skill 子类可以正常实例化。"""
+        from skills.code_review_skill import CodeReviewSkill
+        skill = CodeReviewSkill()
+        assert skill.name == "code_review"
+        assert "code_review" in skill.description.lower() or "审查" in skill.description
+        assert len(skill.trigger_keywords) > 0
+
+    def test_default_tools_empty(self):
+        """默认 get_tools() 返回空列表。"""
+        from skills.code_review_skill import CodeReviewSkill
+        skill = CodeReviewSkill()
+        assert skill.get_tools() == []
+
+    def test_should_activate_with_keyword(self):
+        """触发关键词命中时 should_activate 返回 True。"""
+        from skills.code_review_skill import CodeReviewSkill
+        skill = CodeReviewSkill()
+        assert skill.should_activate("帮我审查这段代码") is True
+        assert skill.should_activate("请review一下这个文件") is True
+        assert skill.should_activate("这个代码可能有bug") is True
+
+    def test_should_activate_no_keyword(self):
+        """无触发关键词时 should_activate 返回 False。"""
+        from skills.code_review_skill import CodeReviewSkill
+        skill = CodeReviewSkill()
+        assert skill.should_activate("今天天气怎么样") is False
+        assert skill.should_activate("帮我写一首诗") is False
+
+    def test_should_activate_case_insensitive(self):
+        """关键词匹配不区分大小写。"""
+        from skills.code_review_skill import CodeReviewSkill
+        skill = CodeReviewSkill()
+        assert skill.should_activate("请帮我做 Code Review") is True
+        assert skill.should_activate("这里有个 BUG") is True
+
+
+class TestCodeReviewSkill:
+    """测试 CodeReviewSkill 具体功能。"""
+
+    def test_get_system_prompt_content(self):
+        """System prompt 包含 5 维度审查框架。"""
+        from skills.code_review_skill import CodeReviewSkill
+        skill = CodeReviewSkill()
+        prompt = skill.get_system_prompt()
+        assert "正确性" in prompt
+        assert "安全性" in prompt
+        assert "性能" in prompt
+        assert "可读性" in prompt
+        assert "最佳实践" in prompt
+        assert "审查报告" in prompt
+
+    def test_get_knowledge(self):
+        """知识库包含 OWASP 和 SOLID 等安全知识。"""
+        from skills.code_review_skill import CodeReviewSkill
+        skill = CodeReviewSkill()
+        knowledge = skill.get_knowledge()
+        assert len(knowledge) >= 2
+        assert any("OWASP" in k for k in knowledge)
+        assert any("SOLID" in k for k in knowledge)
+
+    def test_trigger_keywords_comprehensive(self):
+        """触发关键词覆盖所有审查相关词汇。"""
+        from skills.code_review_skill import CodeReviewSkill
+        skill = CodeReviewSkill()
+        triggers = ["审查", "review", "代码质量", "bug", "安全漏洞",
+                     "code review", "代码审查", "重构", "refactor"]
+        for t in triggers:
+            assert skill.should_activate(f"请{t}一下") is True
+
+
+class TestWebDevSkill:
+    """测试 WebDevSkill 具体功能。"""
+
+    def test_get_system_prompt_content(self):
+        """System prompt 包含前端和后端规范。"""
+        from skills.web_dev_skill import WebDevSkill
+        skill = WebDevSkill()
+        prompt = skill.get_system_prompt()
+        assert "前端" in prompt or "HTML" in prompt
+        assert "后端" in prompt or "API" in prompt
+        assert "REST" in prompt or "RESTful" in prompt
+
+    def test_get_knowledge(self):
+        """知识库包含 React 和 RESTful 等 Web 知识。"""
+        from skills.web_dev_skill import WebDevSkill
+        skill = WebDevSkill()
+        knowledge = skill.get_knowledge()
+        assert len(knowledge) >= 3
+        assert any("React" in k for k in knowledge)
+        assert any("REST" in k for k in knowledge)
+
+    def test_trigger_keywords_web(self):
+        """Web 相关触发词能正确激活。"""
+        from skills.web_dev_skill import WebDevSkill
+        skill = WebDevSkill()
+        web_triggers = ["网页", "前端", "后端", "API", "React", "HTML", "CSS", "网站", "接口", "Vue", "JavaScript", "TypeScript"]
+        for t in web_triggers:
+            assert skill.should_activate(f"帮我做一个{t}项目") is True
+
+    def test_should_not_activate_non_web(self):
+        """非 Web 相关消息不应激活。"""
+        from skills.web_dev_skill import WebDevSkill
+        skill = WebDevSkill()
+        assert skill.should_activate("帮我审查代码安全漏洞") is False
+        assert skill.should_activate("计算 1+1") is False
+
+
+class TestSkillRouter:
+    """测试 SkillRouter 路由功能。"""
+
+    def test_register_and_list(self):
+        """注册 Skill 并列出。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        assert "code_review" in router.list_skills()
+
+    def test_register_duplicate_overwrites(self):
+        """重复注册同名 Skill 会覆盖。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        s1 = CodeReviewSkill()
+        s2 = CodeReviewSkill()
+        router.register(s1)
+        router.register(s2)
+        assert router.get_skill("code_review") is s2
+
+    def test_unregister(self):
+        """注销 Skill。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        assert router.unregister("code_review") is True
+        assert router.unregister("nonexistent") is False
+        assert "code_review" not in router.list_skills()
+
+    def test_get_skill(self):
+        """按名称获取 Skill。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        skill = CodeReviewSkill()
+        router.register(skill)
+        assert router.get_skill("code_review") is skill
+        assert router.get_skill("nonexistent") is None
+
+    def test_route_no_activation(self):
+        """无 Skill 激活时返回默认 prompt。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        prompt = router.route("今天天气怎么样")
+        assert "友好且有帮助" in prompt
+        assert "代码审查" not in prompt
+
+    def test_route_code_review_activation(self):
+        """代码审查消息激活 CodeReviewSkill。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        prompt = router.route("帮我审查这段代码")
+        assert "审查" in prompt
+        assert "正确性" in prompt
+        assert "安全性" in prompt
+
+    def test_route_web_dev_activation(self):
+        """Web 开发消息激活 WebDevSkill。"""
+        from skills.router import SkillRouter
+        from skills.web_dev_skill import WebDevSkill
+        router = SkillRouter()
+        router.register(WebDevSkill())
+        prompt = router.route("帮我做一个React前端页面")
+        assert "Web" in prompt or "前端" in prompt
+        assert "HTML" in prompt or "CSS" in prompt or "React" in prompt
+
+    def test_route_multi_skill_activation(self):
+        """多 Skill 同时激活时 prompt 包含所有 Skill 内容。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        from skills.web_dev_skill import WebDevSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        router.register(WebDevSkill())
+        prompt = router.route("帮我审查这个React前端代码的安全漏洞")
+        assert "审查" in prompt
+        assert "Web" in prompt or "前端" in prompt
+        assert "多个 Skill" in prompt or "不冲突" in prompt
+
+    def test_get_active_tools_empty(self):
+        """默认无激活 Skill 的工具。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        tools = router.get_active_tools("今天天气怎么样")
+        assert tools == []
+
+    def test_get_active_knowledge(self):
+        """激活 Skill 时返回知识库。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        knowledge = router.get_active_knowledge("帮我审查这段代码")
+        assert len(knowledge) > 0
+        assert any("OWASP" in k for k in knowledge)
+
+    def test_get_active_skill_names(self):
+        """获取激活的 Skill 名称列表。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        from skills.web_dev_skill import WebDevSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        router.register(WebDevSkill())
+        names = router.get_active_skill_names("帮我审查代码")
+        assert "code_review" in names
+        assert "web_dev" not in names
+
+    def test_route_only_web_dev_message(self):
+        """纯 Web 开发消息只激活 WebDevSkill。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        from skills.web_dev_skill import WebDevSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        router.register(WebDevSkill())
+        prompt = router.route("帮我写一个HTML页面")
+        assert "审查" not in prompt
+        assert "Web" in prompt or "前端" in prompt or "HTML" in prompt
+
+    def test_route_includes_knowledge(self):
+        """激活 Skill 的 route 输出包含知识库。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        prompt = router.route("帮我审查代码")
+        assert "参考知识库" in prompt
+        assert "OWASP" in prompt
+
+    def test_list_skills_empty(self):
+        """空路由器返回空列表。"""
+        from skills.router import SkillRouter
+        router = SkillRouter()
+        assert router.list_skills() == []
+
+    def test_multiple_skills_registration(self):
+        """注册多个 Skill 后 list_skills 返回所有名称。"""
+        from skills.router import SkillRouter
+        from skills.code_review_skill import CodeReviewSkill
+        from skills.web_dev_skill import WebDevSkill
+        router = SkillRouter()
+        router.register(CodeReviewSkill())
+        router.register(WebDevSkill())
+        names = router.list_skills()
+        assert "code_review" in names
+        assert "web_dev" in names
+        assert len(names) == 2
+
+
+# ============================================================================
 # 直接运行入口
 # ============================================================================
 
