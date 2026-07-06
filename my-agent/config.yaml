@@ -1,0 +1,23 @@
+# Agent 配置文件
+llm_model: "gpt-4o"
+llm_fallback_model: "gpt-4o-mini"
+max_turns: 10
+max_tokens_per_turn: 8000
+temperature: 0.7
+enable_cache: true
+
+# 沙箱允许访问的目录
+allowed_directories:
+  - "./workspace"
+  - "./output"
+
+# 被阻止的命令
+blocked_commands:
+  - "rm -rf"
+  - "format"
+
+# MCP Servers 配置
+mcp_servers:
+  - name: "filesystem"
+    command: "python"
+    args: ["mcp_servers/file_server.py"]
