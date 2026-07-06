@@ -19,15 +19,15 @@
 
 ## 二、项目当前进度
 
-### 总体阶段：阶段 2（工具调用）✅ 已完成
+### 总体阶段：阶段 3（上下文工程）✅ 已完成
 
 | 阶段 | 名称 | 状态 | 说明 |
 |------|------|------|------|
 | 阶段 0 | 项目初始化 | ✅ 完成 | 目录结构、配置文件、虚拟环境、依赖安装、Git 管理 |
 | 阶段 1 | 最小可行 Agent（Hello World） | ✅ 完成 | `agent.py` - SimpleAgent 类，对话历史维护，REPL 入口 |
 | 阶段 2 | 工具调用（Tool Use） | ✅ 完成 | `tools.py` - ToolRegistry，时间/计算/搜索工具；`agent.py` 升级为 ToolAgent |
-| 阶段 3 | 上下文工程 | ⏳ 进行中 | `context_manager.py` - 历史压缩、RAG、Prompt 模板 |
-| 阶段 4 | MCP 协议集成 | ⏳ 待开始 | `mcp_servers/file_server.py`、`mcp_client.py`、MCPAgent |
+| 阶段 3 | 上下文工程 | ✅ 完成 | `context_manager.py` - ContextManager、SimpleRAG、Prompt 模板 |
+| 阶段 4 | MCP 协议集成 | ⏳ 进行中 | `mcp_servers/file_server.py`、`mcp_client.py`、MCPAgent |
 | 阶段 5 | Skill 设计 | ⏳ 待开始 | `skills/` - CodeReview、WebDev、SkillRouter |
 | 阶段 6 | Harness 工程 | ⏳ 待开始 | `harness/` - 日志、配置、错误恢复、沙箱 |
 | 阶段 7 | 可信性判断与评估 | ⏳ 待开始 | `evaluation/` - AgentEvaluator、SecurityAuditor |
@@ -50,6 +50,7 @@ project/
     ├── README.md                         # 项目说明
     ├── agent.py                          # ToolAgent 类（阶段 2 升级）
     ├── tools.py                          # ToolRegistry + 3 个工具（阶段 2）
+    ├── context_manager.py                # ContextManager + SimpleRAG + Prompt 模板（阶段 3）
     ├── evaluation/.gitkeep               # 评估模块（空）
     ├── harness/.gitkeep                  # 基础设施（空）
     ├── knowledge/.gitkeep                # 知识库（空）
@@ -61,7 +62,7 @@ project/
 ### Git 状态
 - **分支**：`main`
 - **远程**：`origin` → https://github.com/yaorz26/SETraingingCampProject.git
-- **最新提交**：`8c13b2f` feat: stage 2 - Tool Use with ToolRegistry
+- **最新提交**：`6322a43` feat: stage 3 - ContextManager, SimpleRAG, Prompt template
 - **工作区**：干净
 
 ---
@@ -120,31 +121,34 @@ project/
 
 ## 五、下一步行动
 
-**当前任务**：开始阶段 3 - 上下文工程
+**当前任务**：开始阶段 4 - MCP 协议集成
 
-**阶段 2 完成情况**：
-- ✅ `my-agent/tools.py` 已创建，包含 `ToolRegistry` 类 + 3 个工具
-  - `get_current_time`：返回当前时间
-  - `calculate`：用 `ast.parse` + 白名单安全实现（禁止 `eval`）
-  - `search_web`：模拟网页搜索
-- ✅ `my-agent/agent.py` 升级为 `ToolAgent` 类
-  - 工具调用循环（最多 `max_turns` 轮）
-  - `last_tool_calls` 记录供评估器使用
-  - 完整的 tool_calls → tool result 消息链路
-- ✅ 测试验证通过：`calculate("100*25+3")` → 2503，危险输入被拒绝
-- ✅ 已提交推送：`8c13b2f` feat: stage 2 - Tool Use with ToolRegistry
+**阶段 3 完成情况**：
+- ✅ `my-agent/context_manager.py` 已创建，包含 3 个组件：
+  - `build_system_prompt(**kwargs)` — Prompt 模板，支持变量替换，未提供字段使用默认值
+  - `SimpleRAG` — 字符级 2-gram Jaccard 相似度（中文友好），`add_document` / `search` 方法
+  - `ContextManager` — 历史压缩（gpt-4o-mini 摘要），`build_context` 组装完整上下文
+- ✅ 测试验证通过：
+  - Prompt 模板：`build_system_prompt(role_description="代码审查")` 正常填充
+  - RAG 检索：查询"编程语言有哪些"返回 Java/Python 文档，score > 0
+  - 边界情况：不相关查询返回空列表
+  - build_context：短历史全量保留 + knowledge 注入；长历史（>20 条）触发压缩
+- ✅ 已提交推送：`6322a43` feat: stage 3 - ContextManager, SimpleRAG, Prompt template
 
-**待创建文件（阶段 3）**：
-- `my-agent/context_manager.py`：历史压缩、RAG 检索、Prompt 模板管理
+**待创建文件（阶段 4）**：
+- `my-agent/mcp_servers/file_server.py`：FastMCP 文件系统 Server
+- `my-agent/mcp_client.py`：MCPToolManager（Stdio 连接 + 工具转换）
+- 升级 `my-agent/agent.py` 为 `MCPAgent`（统一异步）
 
-**验证标准（阶段 3）**：
-- [ ] 对话历史能在 token 超限时自动压缩
-- [ ] RAG 检索能基于知识库返回相关上下文
-- [ ] Prompt 模板支持变量替换和动态组装
+**验证标准（阶段 4）**：
+- [ ] MCP Server 可独立启动
+- [ ] Agent 能通过 MCP 调用 `read_file`
+- [ ] 资源在 `shutdown` 时正确释放
 
 **关键约束**：
-- RAG 使用字符级 2-gram Jaccard 相似度（适配中文）
-- 上下文压缩沿用 LLMLingua 方案（见开发指南）
+- 使用 `mcp.server.fastmcp.FastMCP` 简化实现
+- MCP 连接用 `contextlib.AsyncExitStack` 管理
+- 所有方法统一为 `async def`
 
 ---
 
