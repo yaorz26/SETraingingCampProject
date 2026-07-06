@@ -702,6 +702,230 @@ class TestEndToEnd:
 
 
 # ============================================================================
+# 阶段 4 — MCP 协议集成测试
+# ============================================================================
+
+class TestMCPServer:
+    """测试 MCP File System Server 定义（无需启动 stdio）。"""
+
+    def test_fastmcp_instance_created(self):
+        """验证 FastMCP 实例可正常创建。"""
+        from mcp_servers.file_server import mcp
+        assert mcp is not None
+        assert hasattr(mcp, "run")
+
+    def test_server_name(self):
+        """验证 Server 名称。"""
+        from mcp_servers.file_server import mcp
+        assert mcp.name == "file-system-server"
+
+    def test_tools_registered(self):
+        """验证三个工具已注册。"""
+        from mcp_servers.file_server import mcp
+        tool_names = {t.name for t in mcp._tool_manager._tools.values()}
+        assert "read_file" in tool_names
+        assert "list_directory" in tool_names
+        assert "write_file" in tool_names
+
+
+class TestMCPToolManager:
+    """测试 MCPToolManager 类（无需实际 MCP Server 连接）。"""
+
+    def test_init_empty(self):
+        """初始化后工具列表为空。"""
+        from mcp_client import MCPToolManager
+        manager = MCPToolManager()
+        assert manager.get_openai_tools() == []
+        assert manager.get_tool_names() == []
+
+    def test_schema_conversion(self):
+        """验证 MCP Tool 到 OpenAI schema 的转换。"""
+        from mcp_client import MCPToolManager
+
+        # 模拟 MCP Tool 对象
+        class MockTool:
+            name = "test_tool"
+            description = "A test tool"
+            inputSchema = {
+                "type": "object",
+                "properties": {
+                    "param1": {
+                        "type": "string",
+                        "description": "First param"
+                    }
+                },
+                "required": ["param1"]
+            }
+
+        schema = MCPToolManager._mcp_tool_to_openai_schema(MockTool())
+        assert schema["type"] == "function"
+        assert schema["function"]["name"] == "test_tool"
+        assert schema["function"]["description"] == "A test tool"
+        params = schema["function"]["parameters"]
+        assert params["type"] == "object"
+        assert "param1" in params["properties"]
+        assert "param1" in params["required"]
+
+    def test_schema_conversion_no_input_schema(self):
+        """验证无 inputSchema 时的降级处理。"""
+        from mcp_client import MCPToolManager
+
+        class MockToolNoSchema:
+            name = "bare_tool"
+            description = None
+
+        schema = MCPToolManager._mcp_tool_to_openai_schema(MockToolNoSchema())
+        assert schema["type"] == "function"
+        assert schema["function"]["name"] == "bare_tool"
+        assert schema["function"]["description"] == "Tool: bare_tool"
+        assert schema["function"]["parameters"]["properties"] == {}
+
+    def test_execute_tool_not_found(self):
+        """执行不存在的工具返回错误。"""
+        import asyncio
+        from mcp_client import MCPToolManager
+
+        async def _test():
+            manager = MCPToolManager()
+            result = await manager.execute_tool("nonexistent", {})
+            assert "Error" in result
+
+        asyncio.run(_test())
+
+    def test_close_all_idempotent(self):
+        """close_all 可多次调用不报错。"""
+        import asyncio
+        from mcp_client import MCPToolManager
+
+        async def _test():
+            manager = MCPToolManager()
+            await manager.close_all()
+            await manager.close_all()
+            assert manager.get_tool_names() == []
+
+        asyncio.run(_test())
+
+
+class TestMCPAgent:
+    """测试 MCPAgent 类（无需 API Key 的功能测试）。"""
+
+    def test_init_without_api_key_raises(self):
+        """无 API Key 时初始化抛出 ValueError。"""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": ""}, clear=False):
+            from agent import MCPAgent
+            with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+                MCPAgent()
+
+    def test_mcpagent_has_expected_attributes(self):
+        """MCPAgent 初始化后具有预期属性。"""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            from agent import MCPAgent
+            agent = MCPAgent()
+            assert agent.max_turns == 10
+            assert agent.history == []
+            assert agent.last_tool_calls == []
+            assert agent.tool_registry is not None
+            assert agent.mcp is not None
+
+    def test_get_all_tools_includes_builtin(self):
+        """_get_all_tools 包含内置工具。"""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            from agent import MCPAgent
+            agent = MCPAgent()
+            tools = agent._get_all_tools()
+            tool_names = [t["function"]["name"] for t in tools]
+            assert "get_current_time" in tool_names
+            assert "calculate" in tool_names
+            assert "search_web" in tool_names
+
+    def test_setup_without_config_no_error(self):
+        """setup() 在无 config.yaml 时不报错。"""
+        import asyncio
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            from agent import MCPAgent
+            async def _test():
+                agent = MCPAgent()
+                # setup 应该安全降级（没有 MCP Server 也不报错）
+                await agent.setup()
+                await agent.shutdown()
+            asyncio.run(_test())
+
+    def test_reset_clears_history(self):
+        """reset() 清空历史。"""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            from agent import MCPAgent
+            agent = MCPAgent()
+            agent.history = [{"role": "user", "content": "test"}]
+            agent.last_tool_calls = [{"name": "test"}]
+            agent.reset()
+            assert agent.history == []
+            assert agent.last_tool_calls == []
+
+    def test_shutdown_twice_no_error(self):
+        """shutdown 可多次调用不报错。"""
+        import asyncio
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            from agent import MCPAgent
+            async def _test():
+                agent = MCPAgent()
+                await agent.shutdown()
+                await agent.shutdown()
+            asyncio.run(_test())
+
+    def test_execute_tool_builtin_fallback(self):
+        """_execute_tool 优先使用内置工具。"""
+        import asyncio
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            from agent import MCPAgent
+            async def _test():
+                agent = MCPAgent()
+                result = await agent._execute_tool("get_current_time", {})
+                assert ":" in result  # 时间格式
+                assert "-" in result
+                await agent.shutdown()
+            asyncio.run(_test())
+
+    def test_execute_tool_mcp_not_found(self):
+        """_execute_tool 对不存在的 MCP 工具返回错误。"""
+        import asyncio
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):
+            from agent import MCPAgent
+            async def _test():
+                agent = MCPAgent()
+                result = await agent._execute_tool("nonexistent", {})
+                assert "Error" in result
+                await agent.shutdown()
+            asyncio.run(_test())
+
+    @pytest.mark.skipif(not _has_api_key(), reason="需要有效的 API Key")
+    def test_mcpagent_chat_text_only(self):
+        """MCPAgent 纯文本对话（无工具调用）。"""
+        import asyncio
+        from agent import MCPAgent
+
+        async def _test():
+            agent = MCPAgent()
+            reply = await agent.chat("用一句话回复：1+1等于几？")
+            assert len(reply) > 0
+            await agent.shutdown()
+        asyncio.run(_test())
+
+    @pytest.mark.skipif(not _has_api_key(), reason="需要有效的 API Key")
+    def test_mcpagent_chat_with_tool(self):
+        """MCPAgent 工具调用（calculate）。"""
+        import asyncio
+        from agent import MCPAgent
+
+        async def _test():
+            agent = MCPAgent()
+            reply = await agent.chat("计算 123 * 456")
+            assert len(reply) > 0
+            assert "56088" in reply.replace(",", "")
+            await agent.shutdown()
+        asyncio.run(_test())
+
+
+# ============================================================================
 # 直接运行入口
 # ============================================================================
 

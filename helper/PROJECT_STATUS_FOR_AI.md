@@ -19,7 +19,7 @@
 
 ## 二、项目当前进度
 
-### 总体阶段：阶段 3（上下文工程）✅ 已完成
+### 总体阶段：阶段 4（MCP 协议集成）✅ 已完成
 
 | 阶段 | 名称 | 状态 | 说明 |
 |------|------|------|------|
@@ -27,7 +27,7 @@
 | 阶段 1 | 最小可行 Agent（Hello World） | ✅ 完成 | `agent.py` - SimpleAgent 类，对话历史维护，REPL 入口 |
 | 阶段 2 | 工具调用（Tool Use） | ✅ 完成 | `tools.py` - ToolRegistry，时间/计算/搜索工具；`agent.py` 升级为 ToolAgent |
 | 阶段 3 | 上下文工程 | ✅ 完成 | `context_manager.py` - ContextManager、SimpleRAG、Prompt 模板 |
-| 阶段 4 | MCP 协议集成 | ⏳ 进行中 | `mcp_servers/file_server.py`、`mcp_client.py`、MCPAgent |
+| 阶段 4 | MCP 协议集成 | ✅ 完成 | `mcp_servers/file_server.py`、`mcp_client.py`、MCPAgent |
 | 阶段 5 | Skill 设计 | ⏳ 待开始 | `skills/` - CodeReview、WebDev、SkillRouter |
 | 阶段 6 | Harness 工程 | ⏳ 待开始 | `harness/` - 日志、配置、错误恢复、沙箱 |
 | 阶段 7 | 可信性判断与评估 | ⏳ 待开始 | `evaluation/` - AgentEvaluator、SecurityAuditor |
@@ -48,23 +48,25 @@ project/
     ├── config.yaml                       # 项目配置
     ├── requirements.txt                  # Python 依赖
     ├── README.md                         # 项目说明
-    ├── agent.py                          # ToolAgent 类（阶段 2 升级）
+    ├── agent.py                          # ToolAgent + MCPAgent 类（阶段 4 升级）
     ├── tools.py                          # ToolRegistry + 3 个工具（阶段 2）
     ├── context_manager.py                # ContextManager + SimpleRAG + Prompt 模板（阶段 3）
+    ├── mcp_client.py                     # MCPToolManager（Stdio 连接 + 工具转换）
     ├── evaluation/.gitkeep               # 评估模块（空）
     ├── harness/.gitkeep                  # 基础设施（空）
     ├── knowledge/.gitkeep                # 知识库（空）
-    ├── mcp_servers/.gitkeep              # MCP Server（空）
+    ├── mcp_servers/                      # MCP Server 模块
+    │   ├── __init__.py                   # 包初始化
+    │   └── file_server.py                # FastMCP 文件系统 Server（read_file/list_directory/write_file）
     ├── skills/.gitkeep                   # Skill 模块（空）
-    ├── tests/.gitkeep                    # 测试目录标记
-    └── tests/test_all.py                 # 完整测试套件（83 tests, 阶段 0~3）
+    └── tests/test_all.py                 # 完整测试套件（101 tests, 阶段 0~4）
 ```
 
 ### Git 状态
 - **分支**：`main`
 - **远程**：`origin` → https://github.com/yaorz26/SETraingingCampProject.git
 - **最新提交**：`162249b` test: add comprehensive test suite (83 tests, stages 0-3)
-- **工作区**：干净
+- **工作区**：有未提交更改（阶段 4 文件）
 
 ---
 
@@ -122,42 +124,37 @@ project/
 
 ## 五、下一步行动
 
-**当前任务**：开始阶段 4 - MCP 协议集成
+**当前任务**：开始阶段 5 - Skill 设计
 
-**阶段 3 完成情况**：
-- ✅ `my-agent/context_manager.py` 已创建，包含 3 个组件：
-  - `build_system_prompt(**kwargs)` — Prompt 模板，支持变量替换，未提供字段使用默认值
-  - `SimpleRAG` — 字符级 2-gram Jaccard 相似度（中文友好），`add_document` / `search` 方法
-  - `ContextManager` — 历史压缩（gpt-4o-mini 摘要），`build_context` 组装完整上下文
-- ✅ 测试验证通过：
-  - Prompt 模板：`build_system_prompt(role_description="代码审查")` 正常填充
-  - RAG 检索：查询"编程语言有哪些"返回 Java/Python 文档，score > 0
-  - 边界情况：不相关查询返回空列表
-  - build_context：短历史全量保留 + knowledge 注入；长历史（>20 条）触发压缩
-- ✅ 已提交推送：`6322a43` feat: stage 3 - ContextManager, SimpleRAG, Prompt template
-- ✅ 完整测试套件：`tests/test_all.py`，83 个测试全部通过（阶段 0~3），已提交推送：`162249b`
-- **测试覆盖**：
-  - 阶段 0：项目配置、依赖、config.yaml、.env.example、.gitignore
-  - 阶段 1：SimpleAgent 基础（通过 ToolAgent 纯对话模式）
-  - 阶段 2：工具系统（ToolRegistry、calculate 10 项参数化、safe_calculate、search_web、get_current_time）
-  - 阶段 3：Prompt 模板、SimpleRAG（ngrams/Jaccard/中文检索）、ContextManager（压缩/阈值/摘要）
-  - 端到端：Agent 工具链、多轮记忆、ContextManager 集成
-  - 运行方式：`cd my-agent && ..\venv\Scripts\python.exe -m pytest tests/test_all.py -v`
+**阶段 4 完成情况**：
+- ✅ `my-agent/mcp_servers/file_server.py` 已创建 — FastMCP 文件系统 Server
+  - 3 个工具：`read_file`、`list_directory`、`write_file`
+  - 安全限制：`allowed_root` 白名单目录，防止路径穿越
+  - 启动方式：`python -m mcp_servers.file_server`
+- ✅ `my-agent/mcp_client.py` 已创建 — MCPToolManager
+  - 通过 stdio 子进程连接 MCP Server
+  - `_mcp_tool_to_openai_schema()` 将 MCP Tool 格式转换为 OpenAI function calling schema
+  - `connect_server()` 异步连接，`list_tools()` 获取工具列表，`execute_tool()` 调用工具
+  - `close_all()` 使用 `AsyncExitStack` 管理资源释放
+  - `get_openai_tools()` / `get_tool_names()` 查询接口
+- ✅ `my-agent/agent.py` 升级为 `MCPAgent`
+  - 所有方法统一为 `async def`
+  - `_get_all_tools()` 合并内置工具 + MCP 工具
+  - `_execute_tool()` 优先使用内置工具，内置未找到则尝试 MCP
+  - `setup()` 从 config.yaml 读取 MCP Server 配置并连接
+  - `shutdown()` 释放所有 MCP 连接资源
+  - 保留 `ToolAgent` 向后兼容（同步 chat 方法）
+  - 删除 `mcp_servers/.gitkeep`
+- ✅ 测试验证通过：101 个测试全部通过（阶段 0~4）
+  - 新增 18 个阶段 4 测试：MCPServer（3）、MCPToolManager（5）、MCPAgent（10）
+  - 覆盖：FastMCP 实例创建、工具注册、Schema 转换、工具执行、初始化/重置/关闭
+  - 运行方式：`cd my-agent && .\venv\Scripts\python.exe -m pytest tests/test_all.py -v`
 
-**待创建文件（阶段 4）**：
-- `my-agent/mcp_servers/file_server.py`：FastMCP 文件系统 Server
-- `my-agent/mcp_client.py`：MCPToolManager（Stdio 连接 + 工具转换）
-- 升级 `my-agent/agent.py` 为 `MCPAgent`（统一异步）
-
-**验证标准（阶段 4）**：
-- [ ] MCP Server 可独立启动
-- [ ] Agent 能通过 MCP 调用 `read_file`
-- [ ] 资源在 `shutdown` 时正确释放
-
-**关键约束**：
-- 使用 `mcp.server.fastmcp.FastMCP` 简化实现
-- MCP 连接用 `contextlib.AsyncExitStack` 管理
-- 所有方法统一为 `async def`
+**后续阶段任务**：
+- 阶段 5：`skills/` — CodeReview、WebDev、SkillRouter
+- 阶段 6：`harness/` — 日志、配置、错误恢复、沙箱
+- 阶段 7：`evaluation/` — AgentEvaluator、SecurityAuditor
+- 阶段 8：系统集成与交付
 
 ---
 
