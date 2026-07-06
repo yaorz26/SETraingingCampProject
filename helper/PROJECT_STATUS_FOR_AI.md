@@ -56,13 +56,14 @@ project/
     ├── knowledge/.gitkeep                # 知识库（空）
     ├── mcp_servers/.gitkeep              # MCP Server（空）
     ├── skills/.gitkeep                   # Skill 模块（空）
-    └── tests/.gitkeep                    # 测试（空）
+    ├── tests/.gitkeep                    # 测试目录标记
+    └── tests/test_all.py                 # 完整测试套件（83 tests, 阶段 0~3）
 ```
 
 ### Git 状态
 - **分支**：`main`
 - **远程**：`origin` → https://github.com/yaorz26/SETraingingCampProject.git
-- **最新提交**：`6322a43` feat: stage 3 - ContextManager, SimpleRAG, Prompt template
+- **最新提交**：`162249b` test: add comprehensive test suite (83 tests, stages 0-3)
 - **工作区**：干净
 
 ---
@@ -134,6 +135,14 @@ project/
   - 边界情况：不相关查询返回空列表
   - build_context：短历史全量保留 + knowledge 注入；长历史（>20 条）触发压缩
 - ✅ 已提交推送：`6322a43` feat: stage 3 - ContextManager, SimpleRAG, Prompt template
+- ✅ 完整测试套件：`tests/test_all.py`，83 个测试全部通过（阶段 0~3），已提交推送：`162249b`
+- **测试覆盖**：
+  - 阶段 0：项目配置、依赖、config.yaml、.env.example、.gitignore
+  - 阶段 1：SimpleAgent 基础（通过 ToolAgent 纯对话模式）
+  - 阶段 2：工具系统（ToolRegistry、calculate 10 项参数化、safe_calculate、search_web、get_current_time）
+  - 阶段 3：Prompt 模板、SimpleRAG（ngrams/Jaccard/中文检索）、ContextManager（压缩/阈值/摘要）
+  - 端到端：Agent 工具链、多轮记忆、ContextManager 集成
+  - 运行方式：`cd my-agent && ..\venv\Scripts\python.exe -m pytest tests/test_all.py -v`
 
 **待创建文件（阶段 4）**：
 - `my-agent/mcp_servers/file_server.py`：FastMCP 文件系统 Server
