@@ -12,8 +12,8 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-# 加载 .env 环境变量
-load_dotenv()
+# 加载 .env 环境变量（override=True：强制覆盖系统环境变量，确保 .env 中的值生效）
+load_dotenv(override=True)
 
 
 class SimpleAgent:
