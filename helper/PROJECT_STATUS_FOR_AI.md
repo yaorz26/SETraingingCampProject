@@ -2,7 +2,7 @@
 
 > **文档用途**：供 AI 编码助手（Cline/Claude Code 等）快速了解项目当前进度、重要共识与用户要求，避免重复探索。
 > **更新时间**：2026-07-06
-> **维护原则**：每次开发进展后更新此文件，保持与实际状态一致。
+> **维护原则**：每次开发进展后更新此文件，保持与实际状态一致。**每完成一个阶段，必须更新本文档的进度表、文件清单、Git 状态和下一步行动，确保 AI 下次读取时获得最新上下文。**
 
 ---
 
@@ -19,14 +19,14 @@
 
 ## 二、项目当前进度
 
-### 总体阶段：阶段 1（最小可行 Agent）✅ 已完成
+### 总体阶段：阶段 2（工具调用）✅ 已完成
 
 | 阶段 | 名称 | 状态 | 说明 |
 |------|------|------|------|
 | 阶段 0 | 项目初始化 | ✅ 完成 | 目录结构、配置文件、虚拟环境、依赖安装、Git 管理 |
 | 阶段 1 | 最小可行 Agent（Hello World） | ✅ 完成 | `agent.py` - SimpleAgent 类，对话历史维护，REPL 入口 |
-| 阶段 2 | 工具调用（Tool Use） | ⏳ 待开始 | `tools.py` - ToolRegistry，时间/计算/搜索工具 |
-| 阶段 3 | 上下文工程 | ⏳ 待开始 | `context_manager.py` - 历史压缩、RAG、Prompt 模板 |
+| 阶段 2 | 工具调用（Tool Use） | ✅ 完成 | `tools.py` - ToolRegistry，时间/计算/搜索工具；`agent.py` 升级为 ToolAgent |
+| 阶段 3 | 上下文工程 | ⏳ 进行中 | `context_manager.py` - 历史压缩、RAG、Prompt 模板 |
 | 阶段 4 | MCP 协议集成 | ⏳ 待开始 | `mcp_servers/file_server.py`、`mcp_client.py`、MCPAgent |
 | 阶段 5 | Skill 设计 | ⏳ 待开始 | `skills/` - CodeReview、WebDev、SkillRouter |
 | 阶段 6 | Harness 工程 | ⏳ 待开始 | `harness/` - 日志、配置、错误恢复、沙箱 |
@@ -48,7 +48,8 @@ project/
     ├── config.yaml                       # 项目配置
     ├── requirements.txt                  # Python 依赖
     ├── README.md                         # 项目说明
-    ├── agent.py                          # SimpleAgent 类（阶段 1）
+    ├── agent.py                          # ToolAgent 类（阶段 2 升级）
+    ├── tools.py                          # ToolRegistry + 3 个工具（阶段 2）
     ├── evaluation/.gitkeep               # 评估模块（空）
     ├── harness/.gitkeep                  # 基础设施（空）
     ├── knowledge/.gitkeep                # 知识库（空）
@@ -60,7 +61,7 @@ project/
 ### Git 状态
 - **分支**：`main`
 - **远程**：`origin` → https://github.com/yaorz26/SETraingingCampProject.git
-- **最新提交**：阶段 1 提交后更新
+- **最新提交**：`8c13b2f` feat: stage 2 - Tool Use with ToolRegistry
 - **工作区**：干净
 
 ---
@@ -119,32 +120,31 @@ project/
 
 ## 五、下一步行动
 
-**当前任务**：开始阶段 2 - 工具调用（Tool Use）
+**当前任务**：开始阶段 3 - 上下文工程
 
-**阶段 1 完成情况**：
-- ✅ `my-agent/agent.py` 已创建，包含 `SimpleAgent` 类
-- ✅ `__init__`：从 `.env` 读取 `OPENAI_API_KEY`/`OPENAI_BASE_URL`/`LLM_MODEL`，初始化 OpenAI 客户端
-- ✅ `chat(user_message) -> str`：维护多轮对话历史，调用 LLM，返回回复
-- ✅ `reset()`：清空对话历史
-- ✅ `main()`：REPL 入口，输入 `exit`/`quit` 退出
-- ✅ 语法验证通过（`SimpleAgent` 类 + 4 个方法）
-- ✅ 依赖已安装（openai 2.44.0、python-dotenv）
-- ⚠️ 实际 API 调用需用户创建 `.env` 并填入真实 Key（`.env` 已被 .gitignore 排除）
-
-**待创建文件（阶段 2）**：
-- `my-agent/tools.py`：`ToolRegistry` 类 + 具体工具
+**阶段 2 完成情况**：
+- ✅ `my-agent/tools.py` 已创建，包含 `ToolRegistry` 类 + 3 个工具
   - `get_current_time`：返回当前时间
-  - `calculate`：用 `ast.parse` + 白名单安全实现（禁用 `eval`）
-  - `search`：简单搜索（可后续接 RAG）
+  - `calculate`：用 `ast.parse` + 白名单安全实现（禁止 `eval`）
+  - `search_web`：模拟网页搜索
+- ✅ `my-agent/agent.py` 升级为 `ToolAgent` 类
+  - 工具调用循环（最多 `max_turns` 轮）
+  - `last_tool_calls` 记录供评估器使用
+  - 完整的 tool_calls → tool result 消息链路
+- ✅ 测试验证通过：`calculate("100*25+3")` → 2503，危险输入被拒绝
+- ✅ 已提交推送：`8c13b2f` feat: stage 2 - Tool Use with ToolRegistry
 
-**验证标准（阶段 2）**：
-- [ ] Agent 能识别工具调用意图并选择正确工具
-- [ ] `calculate` 拒绝危险输入（如 `__import__`、`os.system`）
-- [ ] 工具结果正确回传给 LLM 生成最终回复
+**待创建文件（阶段 3）**：
+- `my-agent/context_manager.py`：历史压缩、RAG 检索、Prompt 模板管理
+
+**验证标准（阶段 3）**：
+- [ ] 对话历史能在 token 超限时自动压缩
+- [ ] RAG 检索能基于知识库返回相关上下文
+- [ ] Prompt 模板支持变量替换和动态组装
 
 **关键约束**：
-- `calculate` 必须用 `ast.parse` + 白名单，禁止 `eval()`
-- 工具注册采用声明式（装饰器或显式注册）
+- RAG 使用字符级 2-gram Jaccard 相似度（适配中文）
+- 上下文压缩沿用 LLMLingua 方案（见开发指南）
 
 ---
 
