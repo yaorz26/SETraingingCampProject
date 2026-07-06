@@ -19,12 +19,12 @@
 
 ## 二、项目当前进度
 
-### 总体阶段：阶段 0（项目初始化）✅ 已完成
+### 总体阶段：阶段 1（最小可行 Agent）✅ 已完成
 
 | 阶段 | 名称 | 状态 | 说明 |
 |------|------|------|------|
 | 阶段 0 | 项目初始化 | ✅ 完成 | 目录结构、配置文件、虚拟环境、依赖安装、Git 管理 |
-| 阶段 1 | 最小可行 Agent（Hello World） | ⏳ 待开始 | `agent.py` - SimpleAgent 类，对话历史维护 |
+| 阶段 1 | 最小可行 Agent（Hello World） | ✅ 完成 | `agent.py` - SimpleAgent 类，对话历史维护，REPL 入口 |
 | 阶段 2 | 工具调用（Tool Use） | ⏳ 待开始 | `tools.py` - ToolRegistry，时间/计算/搜索工具 |
 | 阶段 3 | 上下文工程 | ⏳ 待开始 | `context_manager.py` - 历史压缩、RAG、Prompt 模板 |
 | 阶段 4 | MCP 协议集成 | ⏳ 待开始 | `mcp_servers/file_server.py`、`mcp_client.py`、MCPAgent |
@@ -48,6 +48,7 @@ project/
     ├── config.yaml                       # 项目配置
     ├── requirements.txt                  # Python 依赖
     ├── README.md                         # 项目说明
+    ├── agent.py                          # SimpleAgent 类（阶段 1）
     ├── evaluation/.gitkeep               # 评估模块（空）
     ├── harness/.gitkeep                  # 基础设施（空）
     ├── knowledge/.gitkeep                # 知识库（空）
@@ -59,7 +60,7 @@ project/
 ### Git 状态
 - **分支**：`main`
 - **远程**：`origin` → https://github.com/yaorz26/SETraingingCampProject.git
-- **最新提交**：`2ab844a feat: 初始化 my-agent 项目结构`
+- **最新提交**：阶段 1 提交后更新
 - **工作区**：干净
 
 ---
@@ -118,22 +119,32 @@ project/
 
 ## 五、下一步行动
 
-**当前任务**：开始阶段 1 - 最小可行 Agent（Hello World）
+**当前任务**：开始阶段 2 - 工具调用（Tool Use）
 
-**待创建文件**：
-- `my-agent/agent.py`：`SimpleAgent` 类
-  - `__init__`：从 `.env` 读取配置，初始化 OpenAI 客户端、system_prompt、history
-  - `chat(user_message) -> str`：维护历史，调用 LLM，返回回复
-  - `__main__`：REPL 循环
+**阶段 1 完成情况**：
+- ✅ `my-agent/agent.py` 已创建，包含 `SimpleAgent` 类
+- ✅ `__init__`：从 `.env` 读取 `OPENAI_API_KEY`/`OPENAI_BASE_URL`/`LLM_MODEL`，初始化 OpenAI 客户端
+- ✅ `chat(user_message) -> str`：维护多轮对话历史，调用 LLM，返回回复
+- ✅ `reset()`：清空对话历史
+- ✅ `main()`：REPL 入口，输入 `exit`/`quit` 退出
+- ✅ 语法验证通过（`SimpleAgent` 类 + 4 个方法）
+- ✅ 依赖已安装（openai 2.44.0、python-dotenv）
+- ⚠️ 实际 API 调用需用户创建 `.env` 并填入真实 Key（`.env` 已被 .gitignore 排除）
 
-**验证标准**：
-- [ ] 能成功与 LLM 对话
-- [ ] 对话历史正确维护（多轮上下文有效）
-- [ ] 无硬编码密钥
+**待创建文件（阶段 2）**：
+- `my-agent/tools.py`：`ToolRegistry` 类 + 具体工具
+  - `get_current_time`：返回当前时间
+  - `calculate`：用 `ast.parse` + 白名单安全实现（禁用 `eval`）
+  - `search`：简单搜索（可后续接 RAG）
+
+**验证标准（阶段 2）**：
+- [ ] Agent 能识别工具调用意图并选择正确工具
+- [ ] `calculate` 拒绝危险输入（如 `__import__`、`os.system`）
+- [ ] 工具结果正确回传给 LLM 生成最终回复
 
 **关键约束**：
-- 不要硬编码 API Key，必须从环境变量读取
-- `model` 从 `LLM_MODEL` 环境变量读取，默认 `gpt-4o`
+- `calculate` 必须用 `ast.parse` + 白名单，禁止 `eval()`
+- 工具注册采用声明式（装饰器或显式注册）
 
 ---
 
