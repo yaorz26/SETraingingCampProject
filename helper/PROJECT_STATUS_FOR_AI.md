@@ -1,220 +1,294 @@
 # 项目状态与共识（AI 阅读版）
 
-> **文档用途**：供 AI 编码助手（Cline/Claude Code 等）快速了解项目当前进度、重要共识与用户要求，避免重复探索。
+> **文档用途**：供 AI 编码助手（Cline/Claude Code 等）在新对话上下文中快速理解项目全貌，避免重复探索。
 > **更新时间**：2026-07-07
-> **维护原则**：每次开发进展后更新此文件，保持与实际状态一致。**每完成一个阶段，必须更新本文档的进度表、文件清单、Git 状态和下一步行动，确保 AI 下次读取时获得最新上下文。**
+> **当前阶段**：**过渡期** — 旧版分阶段开发已完成阶段 0~6，现需按期末通用要求重构流程
 
 ---
 
 ## 一、项目概览
 
-- **项目名称**：My Agent（智能化软件工程训练营项目）
-- **项目目标**：构建一个类似 Claude Code / Codex 的简易但完整的 AI Agent 系统
+- **项目名称**：My Agent — 一个类似 Claude Code / Codex 的简易但完整的 AI Agent 系统
+- **课程**：AI4SE（智能化软件工程训练营）期末项目
+- **项目类型**：A · Coding Agent Harness（首选）
 - **仓库地址**：https://github.com/yaorz26/SETraingingCampProject.git
 - **本地路径**：`d:\yaorz\学习\大二下\智能化软件工程训练营\project`
-- **技术栈**：Python 3.10+、OpenAI SDK、MCP SDK、ChromaDB、pytest
+- **技术栈**：Python 3.13、OpenAI SDK、MCP SDK、ChromaDB、pytest、PyYAML
 - **核心公式**：`Agent = LLM + 工具 + 记忆 + 规划`，强调"可信性判断"
 
 ---
 
-## 二、项目当前进度
+## 二、重要：两份文档的定位与关系
 
-### 总体阶段：阶段 6（Harness 工程）✅ 已完成
+本项目存在**两份开发指南**，一份是旧版（已完成），一份是期末通用要求（待执行）：
 
-| 阶段 | 名称 | 状态 | 说明 |
+| 文档 | 路径 | 定位 | 状态 |
 |------|------|------|------|
-| 阶段 0 | 项目初始化 | ✅ 完成 | 目录结构、配置文件、虚拟环境、依赖安装、Git 管理 |
-| 阶段 1 | 最小可行 Agent（Hello World） | ✅ 完成 | `agent.py` - SimpleAgent 类，对话历史维护，REPL 入口 |
-| 阶段 2 | 工具调用（Tool Use） | ✅ 完成 | `tools.py` - ToolRegistry，时间/计算/搜索工具；`agent.py` 升级为 ToolAgent |
-| 阶段 3 | 上下文工程 | ✅ 完成 | `context_manager.py` - ContextManager、SimpleRAG、Prompt 模板 |
-| 阶段 4 | MCP 协议集成 | ✅ 完成 | `mcp_servers/file_server.py`、`mcp_client.py`、MCPAgent |
-| 阶段 5 | Skill 设计 | ✅ 完成 | `skills/` - Skill 抽象基类、CodeReviewSkill、WebDevSkill、SkillRouter |
-| 阶段 6 | Harness 工程 | ✅ 完成 | `harness/` - 日志、配置、错误恢复、沙箱 |
-| 阶段 7 | 可信性判断与评估 | ⏳ 待开始 | `evaluation/` - AgentEvaluator、SecurityAuditor |
-| 阶段 8 | 系统集成与交付 | ⏳ 待开始 | `main.py` 集成、测试、文档 |
+| 旧版分阶段指南 | `helper/Agent开发指南_AI版.md` | 阶段 0→8 手动编码指令 | **阶段 0~6 已完成，阶段 7~8 未完成** |
+| 期末通用要求 | `docs/general_require.md` | 强制使用 Superpowers 框架的期末项目要求 | **待执行** |
+| 项目类型 A 文件 | `docs/AI4SE_Final_Project_A_Coding_Agent_Harness.md` | A 类项目额外要求（领域设计、mock-LLM 测试、机制演示） | **尚未提供** |
 
-### 已完成的文件清单
+**关键事实**：`docs/general_require.md` 是**期末评分依据**，它要求使用 Superpowers 框架（brainstorming → SPEC → PLAN → subagent + TDD + PR 工作流），与旧版指南的"手动分阶段编码"流程完全不同。旧版指南产出的代码是**可复用资产**，但后续工作必须按新通用要求执行。
+
+---
+
+## 三、旧版指南的执行进度（阶段 0~6 已完成）
+
+### 进度总览
+
+| 阶段 | 名称 | 状态 | 产出 |
+|------|------|------|------|
+| 阶段 0 | 项目初始化 | ✅ 完成 | 目录结构、虚拟环境、配置、Git 管理 |
+| 阶段 1 | 最小可行 Agent | ✅ 完成 | `agent.py` — SimpleAgent 类 |
+| 阶段 2 | 工具调用 | ✅ 完成 | `tools.py` — ToolRegistry + 3 工具；ToolAgent 升级 |
+| 阶段 3 | 上下文工程 | ✅ 完成 | `context_manager.py` — ContextManager、SimpleRAG、Prompt 模板 |
+| 阶段 4 | MCP 协议集成 | ✅ 完成 | `mcp_servers/file_server.py`、`mcp_client.py`、MCPAgent |
+| 阶段 5 | Skill 设计 | ✅ 完成 | `skills/` — Skill 基类、CodeReviewSkill、WebDevSkill、SkillRouter |
+| 阶段 6 | Harness 工程 | ✅ 完成 | `harness/` — AgentConfig、AgentLogger、ErrorRecovery、Sandbox |
+| 阶段 7 | 可信性判断与评估 | ⏳ 未开始 | `evaluation/` — AgentEvaluator、SecurityAuditor |
+| 阶段 8 | 系统集成与交付 | ⏳ 未开始 | `main.py` 集成、README 完善 |
+
+### 完整文件清单
 
 ```
 project/
-├── helper/                              # 辅助文档
-│   ├── Agent开发指南_AI版.md             # 分阶段执行指令（权威文档）
-│   ├── Agent开发指南_已弃用.md           # 旧版（已弃用，勿参考）
-│   ├── helper_pdf/                       # 训练营 PDF 与 OCR 输出
-│   └── PROJECT_STATUS_FOR_AI.md          # 本文件
-└── my-agent/                            # 主项目
-    ├── .env.example                      # 环境变量模板
-    ├── .gitignore                        # Git 忽略规则
-    ├── config.yaml                       # 项目配置
-    ├── requirements.txt                  # Python 依赖
-    ├── README.md                         # 项目说明
-    ├── agent.py                          # ToolAgent + MCPAgent 类（阶段 4 升级）
-    ├── tools.py                          # ToolRegistry + 3 个工具（阶段 2）
-    ├── context_manager.py                # ContextManager + SimpleRAG + Prompt 模板（阶段 3）
-    ├── mcp_client.py                     # MCPToolManager（Stdio 连接 + 工具转换）
-    ├── evaluation/.gitkeep               # 评估模块（空）
-    ├── harness/                          # 基础设施（阶段 6）
-    │   ├── __init__.py                   # 包初始化
-    │   ├── config.py                     # AgentConfig（YAML 配置加载）
-    │   ├── logger.py                     # AgentLogger（日志 + 链路追踪）
-    │   ├── recovery.py                   # ErrorRecovery（错误分类 + 指数退避重试）
-    │   └── sandbox.py                    # Sandbox（路径安全 + 命令阻止）
-    ├── knowledge/.gitkeep                # 知识库（空）
-    ├── mcp_servers/                      # MCP Server 模块
-    │   ├── __init__.py                   # 包初始化
-    │   └── file_server.py                # FastMCP 文件系统 Server（read_file/list_directory/write_file）
-    ├── skills/                           # Skill 模块（阶段 5）
-    │   ├── __init__.py                   # 包初始化
-    │   ├── base.py                       # Skill 抽象基类（name, description, trigger_keywords, should_activate, get_system_prompt, get_tools, get_knowledge）
-    │   ├── code_review_skill.py          # CodeReviewSkill（5 维度审查框架：正确性/安全性/性能/可读性/最佳实践）
-    │   ├── web_dev_skill.py              # WebDevSkill（前端规范 + 后端规范 + RESTful API）
-    │   └── router.py                     # SkillRouter（注册/注销/路由/激活检测/知识库聚合）
-    └── tests/test_all.py                 # 完整测试套件（177 tests, 阶段 0~6）
+├── docs/
+│   └── general_require.md                        # 期末通用要求（评分依据）
+├── helper/                                        # 辅助文档
+│   ├── Agent开发指南_AI版.md                       # 旧版分阶段执行指令（阶段 0~8）
+│   ├── Agent开发指南_已弃用.md                     # 旧版（已弃用，勿参考）
+│   ├── helper_pdf/                                 # 训练营 PDF 与 OCR 输出
+│   └── PROJECT_STATUS_FOR_AI.md                    # 本文件 — AI 上下文文档
+└── my-agent/                                      # 主项目代码
+    ├── .env.example                                # 环境变量模板
+    ├── .gitignore                                  # Git 忽略规则（venv/, .env, __pycache__/, chroma_db/）
+    ├── config.yaml                                 # 项目配置（LLM 模型、MCP Server、路径、命令阻止列表）
+    ├── requirements.txt                            # Python 依赖（openai, mcp, chromadb, pyyaml, pytest 等）
+    ├── README.md                                   # 项目说明（需按新要求重写）
+    ├── agent.py                                    # ToolAgent + MCPAgent 类（async，含 last_tool_calls）
+    ├── tools.py                                    # ToolRegistry + 3 工具（get_current_time, calculate, search_web）
+    ├── context_manager.py                          # ContextManager + SimpleRAG（字符级 2-gram Jaccard）+ Prompt 模板
+    ├── mcp_client.py                               # MCPToolManager（Stdio 连接 + 工具转换 + AsyncExitStack）
+    ├── evaluation/.gitkeep                         # 评估模块（空，阶段 7 待实现）
+    ├── harness/                                    # 基础设施（阶段 6 完成）
+    │   ├── __init__.py                             # 包初始化
+    │   ├── config.py                               # AgentConfig（YAML 加载）+ McpServerConfig
+    │   ├── logger.py                               # AgentLogger（文件 + 内存 trace，链路追踪）
+    │   ├── recovery.py                             # ErrorRecovery（错误分类 + 指数退避重试）
+    │   └── sandbox.py                              # Sandbox（路径安全 + 命令阻止）
+    ├── knowledge/.gitkeep                          # 知识库（空）
+    ├── mcp_servers/                                # MCP Server 模块
+    │   ├── __init__.py                             # 包初始化
+    │   └── file_server.py                          # FastMCP 文件系统 Server（read_file/list_directory/write_file）
+    ├── skills/                                     # Skill 模块（阶段 5 完成）
+    │   ├── __init__.py                             # 包初始化
+    │   ├── base.py                                 # Skill 抽象基类（name, description, trigger_keywords, should_activate）
+    │   ├── code_review_skill.py                    # CodeReviewSkill（5 维度审查框架）
+    │   ├── web_dev_skill.py                        # WebDevSkill（前端 + 后端 + RESTful 规范）
+    │   └── router.py                               # SkillRouter（注册/注销/路由/多 Skill 合并）
+    └── tests/test_all.py                           # 完整测试套件（177 tests, 阶段 0~6，全部通过）
+
+# 注意：以下文件尚未创建（旧版阶段 7~8）
+#   main.py, evaluation/tester.py, evaluation/security.py
 ```
 
 ### Git 状态
+
 - **分支**：`main`
 - **远程**：`origin` → https://github.com/yaorz26/SETraingingCampProject.git
-- **最新提交**：`8d11bd8` feat: stage 6 - Harness工程 (AgentConfig, AgentLogger, ErrorRecovery, Sandbox)
+- **最新提交**：`ed71802` docs: 更新PROJECT_STATUS_FOR_AI.md，修正过时的阶段状态和Git信息
 - **工作区**：干净（已全部提交）
+- **提交历史**（10 个提交，按时间倒序）：
+  ```
+  ed71802 docs: 更新PROJECT_STATUS_FOR_AI.md
+  8d11bd8 feat: stage 6 - Harness工程 (AgentConfig, AgentLogger, ErrorRecovery, Sandbox)
+  2de90dc Add harness __init__.py
+  c00f4ff feat: stage 5 - Skill design framework (CodeReview + WebDev + SkillRouter)
+  e83de78 feat: stage 4 - MCP protocol integration (MCPAgent, file_server, MCPToolManager)
+  8280a4b docs: update PROJECT_STATUS_FOR_AI.md with test suite info
+  162249b test: add comprehensive test suite (83 tests, stages 0-3)
+  5316ce9 docs: update PROJECT_STATUS_FOR_AI.md - stage 3 completed
+  6322a43 feat: stage 3 - ContextManager, SimpleRAG, Prompt template
+  f6c2db8 docs: update PROJECT_STATUS_FOR_AI.md - stage 2 completed
+  ```
+
+### 测试状态
+
+- **测试数量**：177 个（阶段 0~6）
+- **通过率**：100%（177/177 passed）
+- **运行方式**：`cd my-agent && ..\venv\Scripts\python.exe -m pytest tests/test_all.py -v`
+- **测试覆盖**：
+  - 阶段 1：SimpleAgent 基础（对话、历史维护）
+  - 阶段 2：ToolRegistry、calculate（安全计算，无 eval）、get_current_time、search_web
+  - 阶段 3：SimpleRAG（中文 2-gram）、ContextManager、System Prompt 模板
+  - 阶段 4：MCPToolManager、MCPAgent、file_server 工具
+  - 阶段 5：Skill 基类、CodeReviewSkill、WebDevSkill、SkillRouter
+  - 阶段 6：AgentConfig（5）、AgentLogger（12）、ErrorRecovery（15）、Sandbox（16）
 
 ---
 
-## 三、重要共识
+## 四、期末通用要求（docs/general_require.md）摘要
 
-### 3.1 开发流程共识
-1. **分阶段递进**：严格按阶段 0→1→2→...→8 顺序执行，不可跳级。
-2. **每阶段验证**：每阶段完成后必须运行检查点验证，未通过不进入下一阶段。
-3. **增量交付**：每阶段都有可独立运行的验证命令，不依赖未完成阶段。
-4. **权威文档**：`helper/Agent开发指南_AI版.md` 是执行的权威指南，已弃用版不要参考。
+### 4.1 核心要求
 
-### 3.2 技术共识
-1. **安全优先**：
-   - 禁止使用 `eval()`、`os.system()` 硬编码。
-   - 密钥只从环境变量（`.env`）读取，不可硬编码。
-   - `calculate` 工具必须用 `ast.parse` + 白名单实现。
-2. **异步统一**：从 MCPAgent（阶段 4）开始，所有 Agent 方法统一为 `async def`。
-3. **资源管理**：MCP 连接用 `contextlib.AsyncExitStack` 管理，`shutdown()` 必须实现。
-4. **可观测性**：每个 LLM 调用、工具调用都记日志（阶段 6 Harness）。
-5. **中文友好**：RAG 使用字符级 2-gram Jaccard 相似度（非空格分词），适配中文。
-6. **MCP SDK**：使用 `mcp.server.fastmcp.FastMCP` 简化实现，不用旧版手动 `__aenter__`。
+| 要求 | 说明 | 当前状态 |
+|------|------|----------|
+| **Superpowers 框架** | 必须使用 Superpowers 七步工作流 | ❌ 未安装/未使用 |
+| **SPEC.md** | 设计文档（10 个必含章节） | ❌ 未创建 |
+| **PLAN.md** | 细粒度 task 列表 | ❌ 未创建 |
+| **SPEC_PROCESS.md** | brainstorming 过程记录（≥3 轮迭代） | ❌ 未创建 |
+| **TDD 强制** | 先红后绿再重构 | ❌ 当前测试是后补的 |
+| **subagent 驱动开发** | 每个 task 派 subagent + git worktree | ❌ 未使用 |
+| **PR 工作流** | 每个 worktree 对应一个 PR | ❌ 当前直接 push main |
+| **GitHub Actions CI** | 必须配置 unit-test job | ❌ 未配置 |
+| **凭据安全存储** | keyring / 加密，首次引导录入 | ❌ 当前仅 .env |
+| **分发** | 容器/二进制/包 三选一 | ❌ 未实现 |
+| **AGENT_LOG.md** | 按时间戳记录关键节点 | ❌ 未创建 |
+| **REFLECTION.md** | 1500-2500 字反思报告 | ❌ 未创建 |
+| **线上部署 URL** | 可访问的 WebUI 接口 | ❌ 未部署 |
 
-### 3.3 可信性判断共识
-- 每阶段完成后，先回答"**这次输出我能信任吗？为什么？**"再进入下一阶段。
-- 最终交付要求：评估通过率 ≥ 80%。
+### 4.2 Superpowers 七步工作流
 
----
+```
+brainstorming → writing-plans → using-git-worktrees
+    → subagent-driven-development / executing-plans
+    → test-driven-development → requesting-code-review
+    → finishing-a-development-branch
+```
 
-## 四、用户给出的重要要求
+### 4.3 最终交付物清单（来自通用要求 §五）
 
-### 4.1 项目管理要求
-1. **Git 管理**：项目必须纳入 Git 版本管理，推送到指定 GitHub 仓库。
-2. **.gitignore 规范**：`venv/`、`.env`、`__pycache__/`、`chroma_db/` 等必须排除。
-3. **目录结构保留**：空目录使用 `.gitkeep` 保留结构。
-4. **提交规范**：使用 `feat:`/`fix:` 等约定式提交前缀。
-
-### 4.2 文档要求
-1. **AI 可读文档**：在 `helper/` 中维护供 AI 阅读的状态文件（本文件）。
-2. **README 完整**：`my-agent/README.md` 须含架构图、安装步骤、运行命令、评估结果。
-3. **开发日志**：每阶段在 README 中记录问题与解决方案。
-
-### 4.3 交付清单（阶段 8 终态）
-| 序号 | 交付物 | 要求 |
-|------|--------|------|
-| 1 | 源代码 | 完整可运行 |
-| 2 | README.md | 含架构图与运行方法 |
-| 3 | config.yaml + .env.example | 配置完整 |
-| 4 | ≥ 1 个 MCP Server | 文件系统 Server 可运行 |
-| 5 | ≥ 2 个 Skill | CodeReview + WebDev |
-| 6 | 评估报告 | 通过率 ≥ 80% |
-| 7 | 演示截图/视频 | Agent 完成实际任务 |
-| 8 | 开发日志 | 每阶段问题与解决方案 |
+1. `SPEC.md`、`PLAN.md`、`SPEC_PROCESS.md`
+2. 完整源代码（带规范的 commit / PR 历史，无任何真实凭据）
+3. 分发产物与说明（Dockerfile 或二进制构建脚本）
+4. `README.md`（含架构图、安装、运行、分发、安全边界）
+5. `AGENT_LOG.md`
+6. CI 配置（`.github/workflows/`，含 unit-test job）
+7. CI/CD 执行记录（最后一次必须 pass）
+8. `REFLECTION.md`（1500-2500 字反思）
+9. 线上部署 URL（WebUI 可访问）
 
 ---
 
-## 五、下一步行动
+## 五、旧版代码资产的可复用性分析
 
-**当前任务**：阶段 6 已完成，开始阶段 7 - 评估
-
-**阶段 6 完成情况**：
-- ✅ `my-agent/harness/__init__.py` 已创建 — 包初始化
-- ✅ `my-agent/harness/config.py` 已创建 — AgentConfig
-  - `AgentConfig` 数据类：llm_model, llm_fallback_model, max_turns, max_tokens_per_turn, temperature, enable_cache, allowed_directories, blocked_commands, mcp_servers
-  - `McpServerConfig` 数据类：name, command, args
-  - `from_yaml(config_path)` 类方法加载 YAML 配置
-- ✅ `my-agent/harness/logger.py` 已创建 — AgentLogger
-  - 方法：`log_turn_start`, `log_llm_call`, `log_tool_call`, `log_error`, `log_turn_end`, `log_info`, `log_debug`, `log_warning`
-  - `get_trace_summary()` 返回统计：llm_calls, tool_calls, errors
-  - `clear_trace()` 清空链路追踪
-  - 日志同时写入文件（`logs/agent_YYYYMMDD_HHMMSS.log`）和内存 trace
-  - 支持多 logger 实例（不同 name）
-  - 使用 `contextlib.closing` 管理文件句柄生命周期
-- ✅ `my-agent/harness/recovery.py` 已创建 — ErrorRecovery
-  - `ErrorSeverity` 枚举：RETRYABLE / DEGRADABLE / FATAL
-  - `classify_error(error)` 静态方法：根据错误消息关键词分类
-  - `execute_with_recovery(awaitable_func, fallback_func)` 异步模式：指数退避重试
-  - `execute_sync_with_recovery(func, fallback_func)` 同步模式：指数退避重试
-  - `_compute_delay(attempt)` 指数退避：base_delay * 2^(attempt-1)，上限 max_delay
-  - `get_stats()` / `reset_stats()` 统计管理
-  - RETRYABLE：Connection timeout, rate limit, network error
-  - DEGRADABLE：context length exceeded, token limit
-  - FATAL：invalid api key, 401 Unauthorized, 其他未知错误
-- ✅ `my-agent/harness/sandbox.py` 已创建 — Sandbox
-  - `is_path_safe(path)` 检查路径是否在允许目录内（防路径穿越）
-  - `safe_read_file(path)` / `safe_write_file(path, content)` 带沙箱检查的 I/O
-  - `safe_list_directory(path)` 带沙箱检查的目录列表
-  - `is_command_blocked(command, blocked)` 检查命令是否在阻止列表（不区分大小写）
-  - `is_safe_command(command, blocked)` 综合安全检查
-  - `sanitize_path(path)` 路径清理（移除空字节、规范化）
-  - `add_allowed_directory(path)` / `remove_allowed_directory(path)` 动态管理允许目录
-- ✅ 删除 `harness/.gitkeep`
-- ✅ 测试验证通过：177 个测试全部通过（阶段 0~6）
-  - 新增 48 个阶段 6 测试：AgentConfig（5）、AgentLogger（12）、ErrorRecovery（15）、Sandbox（16）
-  - 覆盖：配置加载、日志记录/链路追踪、错误分类/重试/降级、沙箱安全/路径穿越/命令阻止
-  - 运行方式：`cd my-agent && ..\venv\Scripts\python.exe -m pytest tests/test_all.py -v`
-
-**阶段 5 完成情况**：
-- ✅ `my-agent/skills/__init__.py` 已创建 — 包初始化
-- ✅ `my-agent/skills/base.py` 已创建 — Skill 抽象基类
-  - 属性：`name`、`description`、`trigger_keywords`
-  - 方法：`should_activate(user_message)` 关键词匹配（不区分大小写）
-  - 抽象方法：`get_system_prompt()`、`get_tools()`、`get_knowledge()`
-- ✅ `my-agent/skills/code_review_skill.py` 已创建 — CodeReviewSkill
-  - 触发关键词：审查、review、代码质量、bug、安全漏洞、code review、代码审查、重构、refactor
-  - System prompt：5 维度审查框架（正确性/安全性/性能/可读性/最佳实践）
-  - 知识库：OWASP Top 10、SOLID 原则、代码审查清单等 5 条知识
-- ✅ `my-agent/skills/web_dev_skill.py` 已创建 — WebDevSkill
-  - 触发关键词：网页、前端、后端、API、React、HTML、CSS、网站、接口、Vue、JavaScript、TypeScript
-  - System prompt：前端规范（HTML/CSS/JS/React）+ 后端规范（RESTful API）+ 通用规范
-  - 知识库：React 最佳实践、RESTful 设计原则、CSS 布局、Web 安全等 5 条知识
-- ✅ `my-agent/skills/router.py` 已创建 — SkillRouter
-  - `register(skill)` / `unregister(name)` 管理 Skill
-  - `route(user_message)` 激活匹配的 Skill 并构建合并 prompt
-  - `get_skill(name)` / `list_skills()` 查询接口
-  - `get_active_tools(user_message)` / `get_active_knowledge(user_message)` / `get_active_skill_names(user_message)` 获取激活 Skill 的详细信息
-  - 支持多 Skill 同时激活，知识库合并去重
-  - 删除 `skills/.gitkeep`
-- ✅ 测试验证通过：129 个测试全部通过（阶段 0~5）
-  - 新增 28 个阶段 5 测试：SkillBase（6）、CodeReviewSkill（3）、WebDevSkill（4）、SkillRouter（15）
-  - 覆盖：抽象基类约束、关键词激活（含大小写）、System prompt 内容、知识库、路由注册/注销/激活/多 Skill 合并
-  - 运行方式：`cd my-agent && .\venv\Scripts\python.exe -m pytest tests/test_all.py -v`
-
-**阶段 4 完成情况**（已提交）：
-- ✅ `my-agent/mcp_servers/file_server.py` — FastMCP 文件系统 Server（3 工具）
-- ✅ `my-agent/mcp_client.py` — MCPToolManager（Stdio 连接 + 工具转换）
-- ✅ `my-agent/agent.py` — 升级为 MCPAgent（异步统一）
-- ✅ 测试验证通过：101 个测试全部通过（阶段 0~4）
-
-**后续阶段任务**：
-- 阶段 7：`evaluation/` — AgentEvaluator、SecurityAuditor
-- 阶段 8：系统集成与交付
+| 模块 | 在新流程中的角色 | 需要调整的部分 |
+|------|-----------------|---------------|
+| `agent.py` | Harness 内核，subagent 可调用的核心 Agent | 需补充 mock-LLM 支持（A 类项目要求） |
+| `tools.py` | 工具系统 | 可基本保留，需补充 TDD 测试 |
+| `context_manager.py` | Prompt 工程基础设施 | 可基本保留 |
+| `mcp_client.py` + `mcp_servers/` | MCP 协议集成 | 可基本保留 |
+| `skills/` | Skill 框架 | 可基本保留 |
+| `harness/config.py` | 配置管理 | 可基本保留，需扩展凭据安全相关配置 |
+| `harness/logger.py` | 日志系统 | 可基本保留 |
+| `harness/recovery.py` | 错误恢复 | 可基本保留 |
+| `harness/sandbox.py` | 安全沙箱 | 可基本保留 |
+| `tests/test_all.py` | 现有测试 | 需按模块拆分，补充 TDD 风格测试 |
+| `evaluation/` | 待实现 | 需按旧版阶段 7 实现 + 新要求扩展 |
 
 ---
 
-## 六、环境信息
+## 六、重要共识
+
+### 6.1 技术共识（从旧版指南继承）
+
+1. **安全优先**：禁止 `eval()`、`os.system()` 硬编码；密钥只从环境变量读取。
+2. **异步统一**：所有 Agent 方法统一为 `async def`。
+3. **资源管理**：MCP 连接用 `contextlib.AsyncExitStack` 管理。
+4. **中文友好**：RAG 使用字符级 2-gram Jaccard 相似度。
+5. **MCP SDK**：使用 `mcp.server.fastmcp.FastMCP` 简化实现。
+
+### 6.2 新流程共识
+
+1. **Superpowers 是强制工具链**，不可跳过。
+2. **TDD 是硬性要求**：先红、再绿、再重构。
+3. **PR 工作流**：每个 worktree 对应一个 PR，不可直接 push main。
+4. **凭据绝不提交**：`.env` 已在 `.gitignore`，但还需实现 keyring 安全存储。
+5. **SPEC 质量决定实现质量**：必须通过冷启动验证（换一个 agent 测试 spec 清晰度）。
+
+---
+
+## 七、环境信息
 
 - **操作系统**：Windows 11
 - **Shell**：PowerShell（注意：`&&` 不是有效分隔符，用 `;` 或分步执行）
 - **Python**：3.13（venv 已创建于 `my-agent/venv/`）
 - **IDE**：Visual Studio Code
 - **Git**：已配置，远程仓库已关联
+- **编码智能体**：Cline（当前使用中）
+
+---
+
+## 八、给下一个 AI 会话的指令
+
+### 你需要做的事情（按顺序）：
+
+#### 第一步：获取完整要求
+1. 阅读 `docs/general_require.md`（已读取）
+2. 等待用户提供 `docs/AI4SE_Final_Project_A_Coding_Agent_Harness.md`（A 类项目额外要求，如领域设计、mock-LLM 单元测试、机制演示）
+3. 将两份文档拼接为完整要求
+
+#### 第二步：安装 Superpowers
+4. 在当前编码智能体（Cline）中安装 Superpowers 插件
+5. 确认 Superpowers 的 brainstorming、writing-plans、TDD、subagent 等技能可用
+
+#### 第三步：启动 brainstorming → 产出 SPEC.md
+6. 触发 brainstorming 技能，与用户共同设计项目
+7. 产出 `SPEC.md`，必须包含：
+   - 问题陈述、用户故事（≥5 个，INVEST 原则）
+   - 功能规约（按模块，输入/行为/输出/边界/错误处理）
+   - 非功能性需求（性能、安全含凭据威胁模型、可用性、可观测性）
+   - 系统架构（组件图、数据流、外部依赖）
+   - 数据模型
+   - 凭据与分发设计
+   - 技术选型与理由
+   - 验收标准
+   - 风险与未决问题
+   - **A 类额外：领域与机制设计**（见 A 类文件）
+
+#### 第四步：writing-plans → 产出 PLAN.md
+8. 将 SPEC 分解为细粒度 task 列表
+9. 每个 task：2-5 分钟、明确文件路径、明确验证步骤
+10. 标出依赖与可并行部分
+
+#### 第五步：记录过程 → SPEC_PROCESS.md
+11. 记录 brainstorming 关键节点（≥3 轮迭代）
+12. 记录 AI 追问的好问题、你采纳/推翻的建议
+
+#### 第六步：冷启动验证
+13. 换一个不同的智能体，仅凭 SPEC + PLAN 尝试实现 1-2 个 task
+14. 记录暴露的问题，修订 SPEC/PLAN
+
+#### 第七步：实现（subagent + TDD + worktree）
+15. 按 PLAN 创建 git worktrees
+16. 每个 task 派 subagent，TDD 执行
+17. 两阶段评审（spec 合规 → 代码质量）
+18. 更新 PLAN.md + AGENT_LOG.md
+
+#### 第八步：基础设施
+19. 配置 GitHub Actions CI（unit-test job）
+20. 实现凭据安全存储（keyring）
+21. 选定分发方案 + Dockerfile
+22. 实现 WebUI（如 A 类要求）
+
+#### 第九步：交付
+23. 编写/重写 README.md
+24. 编写 AGENT_LOG.md
+25. 编写 REFLECTION.md（1500-2500 字）
+26. 部署线上 URL
+27. 最终 CI 全绿验证
+
+### 旧版代码的处理策略
+
+- **保留所有现有代码**作为参考实现和可复用资产
+- 在 SPEC 中重新设计架构时，**优先复用现有模块**
+- 但必须按 TDD 方式重新走一遍实现（不可直接"补测试"）
+- 旧版阶段 7（evaluation）和阶段 8（main.py 集成）的设计思路可作为 SPEC 参考
+
+### 关键提醒
+
+- 本项目是**个人项目**，不允许组队
+- 工程深度优先于代码量
+- 至少 3 个以上职责清晰的功能模块
+- 最终评估通过率 ≥ 80%
+- 仓库内**不得出现任何真实凭据**
