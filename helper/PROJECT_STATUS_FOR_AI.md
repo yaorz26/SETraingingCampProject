@@ -53,7 +53,12 @@ project/
     ├── context_manager.py                # ContextManager + SimpleRAG + Prompt 模板（阶段 3）
     ├── mcp_client.py                     # MCPToolManager（Stdio 连接 + 工具转换）
     ├── evaluation/.gitkeep               # 评估模块（空）
-    ├── harness/.gitkeep                  # 基础设施（空）
+    ├── harness/                          # 基础设施（阶段 6）
+    │   ├── __init__.py                   # 包初始化
+    │   ├── config.py                     # AgentConfig（YAML 配置加载）
+    │   ├── logger.py                     # AgentLogger（日志 + 链路追踪）
+    │   ├── recovery.py                   # ErrorRecovery（错误分类 + 指数退避重试）
+    │   └── sandbox.py                    # Sandbox（路径安全 + 命令阻止）
     ├── knowledge/.gitkeep                # 知识库（空）
     ├── mcp_servers/                      # MCP Server 模块
     │   ├── __init__.py                   # 包初始化
@@ -64,14 +69,14 @@ project/
     │   ├── code_review_skill.py          # CodeReviewSkill（5 维度审查框架：正确性/安全性/性能/可读性/最佳实践）
     │   ├── web_dev_skill.py              # WebDevSkill（前端规范 + 后端规范 + RESTful API）
     │   └── router.py                     # SkillRouter（注册/注销/路由/激活检测/知识库聚合）
-    └── tests/test_all.py                 # 完整测试套件（129 tests, 阶段 0~5）
+    └── tests/test_all.py                 # 完整测试套件（177 tests, 阶段 0~6）
 ```
 
 ### Git 状态
 - **分支**：`main`
 - **远程**：`origin` → https://github.com/yaorz26/SETraingingCampProject.git
 - **最新提交**：`162249b` test: add comprehensive test suite (83 tests, stages 0-3)
-- **工作区**：有未提交更改（阶段 4 + 阶段 5 文件）
+- **工作区**：有未提交更改（阶段 4 + 阶段 5 + 阶段 6 文件）
 
 ---
 
@@ -129,7 +134,44 @@ project/
 
 ## 五、下一步行动
 
-**当前任务**：开始阶段 6 - Harness 工程
+**当前任务**：阶段 6 已完成，开始阶段 7 - 评估
+
+**阶段 6 完成情况**：
+- ✅ `my-agent/harness/__init__.py` 已创建 — 包初始化
+- ✅ `my-agent/harness/config.py` 已创建 — AgentConfig
+  - `AgentConfig` 数据类：llm_model, llm_fallback_model, max_turns, max_tokens_per_turn, temperature, enable_cache, allowed_directories, blocked_commands, mcp_servers
+  - `McpServerConfig` 数据类：name, command, args
+  - `from_yaml(config_path)` 类方法加载 YAML 配置
+- ✅ `my-agent/harness/logger.py` 已创建 — AgentLogger
+  - 方法：`log_turn_start`, `log_llm_call`, `log_tool_call`, `log_error`, `log_turn_end`, `log_info`, `log_debug`, `log_warning`
+  - `get_trace_summary()` 返回统计：llm_calls, tool_calls, errors
+  - `clear_trace()` 清空链路追踪
+  - 日志同时写入文件（`logs/agent_YYYYMMDD_HHMMSS.log`）和内存 trace
+  - 支持多 logger 实例（不同 name）
+  - 使用 `contextlib.closing` 管理文件句柄生命周期
+- ✅ `my-agent/harness/recovery.py` 已创建 — ErrorRecovery
+  - `ErrorSeverity` 枚举：RETRYABLE / DEGRADABLE / FATAL
+  - `classify_error(error)` 静态方法：根据错误消息关键词分类
+  - `execute_with_recovery(awaitable_func, fallback_func)` 异步模式：指数退避重试
+  - `execute_sync_with_recovery(func, fallback_func)` 同步模式：指数退避重试
+  - `_compute_delay(attempt)` 指数退避：base_delay * 2^(attempt-1)，上限 max_delay
+  - `get_stats()` / `reset_stats()` 统计管理
+  - RETRYABLE：Connection timeout, rate limit, network error
+  - DEGRADABLE：context length exceeded, token limit
+  - FATAL：invalid api key, 401 Unauthorized, 其他未知错误
+- ✅ `my-agent/harness/sandbox.py` 已创建 — Sandbox
+  - `is_path_safe(path)` 检查路径是否在允许目录内（防路径穿越）
+  - `safe_read_file(path)` / `safe_write_file(path, content)` 带沙箱检查的 I/O
+  - `safe_list_directory(path)` 带沙箱检查的目录列表
+  - `is_command_blocked(command, blocked)` 检查命令是否在阻止列表（不区分大小写）
+  - `is_safe_command(command, blocked)` 综合安全检查
+  - `sanitize_path(path)` 路径清理（移除空字节、规范化）
+  - `add_allowed_directory(path)` / `remove_allowed_directory(path)` 动态管理允许目录
+- ✅ 删除 `harness/.gitkeep`
+- ✅ 测试验证通过：177 个测试全部通过（阶段 0~6）
+  - 新增 48 个阶段 6 测试：AgentConfig（5）、AgentLogger（12）、ErrorRecovery（15）、Sandbox（16）
+  - 覆盖：配置加载、日志记录/链路追踪、错误分类/重试/降级、沙箱安全/路径穿越/命令阻止
+  - 运行方式：`cd my-agent && ..\venv\Scripts\python.exe -m pytest tests/test_all.py -v`
 
 **阶段 5 完成情况**：
 - ✅ `my-agent/skills/__init__.py` 已创建 — 包初始化
@@ -164,7 +206,6 @@ project/
 - ✅ 测试验证通过：101 个测试全部通过（阶段 0~4）
 
 **后续阶段任务**：
-- 阶段 6：`harness/` — 日志、配置、错误恢复、沙箱
 - 阶段 7：`evaluation/` — AgentEvaluator、SecurityAuditor
 - 阶段 8：系统集成与交付
 

@@ -1207,6 +1207,553 @@ class TestSkillRouter:
 
 
 # ============================================================================
+# 阶段 6 — Harness 工程测试（无需 API Key）
+# ============================================================================
+
+class TestAgentConfig:
+    """测试 AgentConfig 配置加载。"""
+
+    def test_default_config(self):
+        """默认配置创建。"""
+        from harness.config import AgentConfig
+        config = AgentConfig()
+        assert config.llm_model == "gpt-4o"
+        assert config.llm_fallback_model == "gpt-4o-mini"
+        assert config.max_turns == 10
+        assert config.max_tokens_per_turn == 8000
+        assert config.temperature == 0.7
+        assert config.enable_cache is True
+        assert config.allowed_directories == ["./workspace", "./output"]
+        assert config.blocked_commands == ["rm -rf", "format"]
+        assert config.mcp_servers == []
+
+    def test_from_yaml_loads_correctly(self):
+        """从 config.yaml 加载配置。"""
+        from harness.config import AgentConfig
+        config = AgentConfig.from_yaml("config.yaml")
+        assert config.llm_model == "gpt-4o"
+        assert config.llm_fallback_model == "gpt-4o-mini"
+        assert config.max_turns == 10
+        assert config.temperature == 0.7
+        assert isinstance(config.allowed_directories, list)
+        assert isinstance(config.blocked_commands, list)
+        assert len(config.mcp_servers) >= 1
+        assert config.mcp_servers[0].name == "filesystem"
+
+    def test_from_yaml_file_not_found(self):
+        """不存在的配置文件抛出 FileNotFoundError。"""
+        from harness.config import AgentConfig
+        with pytest.raises(FileNotFoundError):
+            AgentConfig.from_yaml("nonexistent_config.yaml")
+
+    def test_mcp_server_config_dataclass(self):
+        """McpServerConfig 数据类。"""
+        from harness.config import McpServerConfig
+        mcp = McpServerConfig(name="test", command="python", args=["server.py"])
+        assert mcp.name == "test"
+        assert mcp.command == "python"
+        assert mcp.args == ["server.py"]
+
+    def test_config_repr(self):
+        """AgentConfig repr 输出。"""
+        from harness.config import AgentConfig
+        config = AgentConfig()
+        r = repr(config)
+        assert "AgentConfig" in r
+        assert "gpt-4o" in r
+
+
+class TestAgentLogger:
+    """测试 AgentLogger 日志记录。"""
+
+    def test_logger_initialization(self):
+        """日志记录器初始化。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                assert logger.trace == []
+                assert logger.get_log_file() is not None
+                assert logger.get_log_file().endswith(".log")
+            finally:
+                logger.close()
+
+    def test_log_turn_start(self):
+        """记录轮次开始。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                logger.log_turn_start(1, "你好")
+                assert len(logger.trace) == 1
+                assert logger.trace[0]["type"] == "turn_start"
+                assert logger.trace[0]["data"]["turn"] == 1
+                assert logger.trace[0]["data"]["user_message"] == "你好"
+            finally:
+                logger.close()
+
+    def test_log_llm_call(self):
+        """记录 LLM 调用。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                logger.log_llm_call("gpt-4o", 350, 0.5)
+                assert len(logger.trace) == 1
+                assert logger.trace[0]["type"] == "llm_call"
+                assert logger.trace[0]["data"]["model"] == "gpt-4o"
+                assert logger.trace[0]["data"]["tokens_used"] == 350
+                assert logger.trace[0]["data"]["response_time"] == 0.5
+            finally:
+                logger.close()
+
+    def test_log_tool_call(self):
+        """记录工具调用。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                logger.log_tool_call("get_current_time", {}, "2026-07-07 12:00:00")
+                assert len(logger.trace) == 1
+                assert logger.trace[0]["type"] == "tool_call"
+                assert logger.trace[0]["data"]["name"] == "get_current_time"
+                assert logger.trace[0]["data"]["result"] == "2026-07-07 12:00:00"
+            finally:
+                logger.close()
+
+    def test_log_error(self):
+        """记录错误。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                logger.log_error("网络超时")
+                assert len(logger.trace) == 1
+                assert logger.trace[0]["type"] == "error"
+                assert logger.trace[0]["data"]["error"] == "网络超时"
+            finally:
+                logger.close()
+
+    def test_log_turn_end(self):
+        """记录轮次结束。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                logger.log_turn_end(1, "你好！", 1.5)
+                assert len(logger.trace) == 1
+                assert logger.trace[0]["type"] == "turn_end"
+                assert logger.trace[0]["data"]["response"] == "你好！"
+                assert logger.trace[0]["data"]["total_time"] == 1.5
+            finally:
+                logger.close()
+
+    def test_trace_summary(self):
+        """链路追踪摘要。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                logger.log_turn_start(1, "测试")
+                logger.log_llm_call("gpt-4o", 100, 0.3)
+                logger.log_tool_call("calculate", {"expression": "1+1"}, "2")
+                logger.log_turn_end(1, "结果是2", 0.5)
+                summary = logger.get_trace_summary()
+                assert summary["llm_calls"] == 1
+                assert summary["tool_calls"] == 1
+                assert summary["errors"] == 0
+            finally:
+                logger.close()
+
+    def test_clear_trace(self):
+        """清空链路追踪。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                logger.log_turn_start(1, "测试")
+                assert len(logger.trace) == 1
+                logger.clear_trace()
+                assert logger.trace == []
+            finally:
+                logger.close()
+
+    def test_log_file_created(self):
+        """日志文件被创建。"""
+        import tempfile
+        import os
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                log_file = logger.get_log_file()
+                assert os.path.exists(log_file)
+            finally:
+                logger.close()
+
+    def test_log_info_and_debug(self):
+        """log_info 和 log_debug 方法。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger = AgentLogger(log_dir=tmpdir)
+            try:
+                logger.log_info("信息消息")
+                logger.log_debug("调试消息")
+                logger.log_warning("警告消息")
+                # 这些方法不写入 trace，只写入日志文件
+                assert logger.get_log_file() is not None
+            finally:
+                logger.close()
+
+    def test_multiple_loggers_different_names(self):
+        """不同名称的 logger 不冲突。"""
+        import tempfile
+        from harness.logger import AgentLogger
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger1 = AgentLogger(log_dir=tmpdir, name="agent1")
+            logger2 = AgentLogger(log_dir=tmpdir, name="agent2")
+            try:
+                logger1.log_turn_start(1, "hello")
+                logger2.log_turn_start(1, "world")
+                assert len(logger1.trace) == 1
+                assert len(logger2.trace) == 1
+            finally:
+                logger1.close()
+                logger2.close()
+
+
+class TestErrorRecovery:
+    """测试 ErrorRecovery 错误分类与恢复。"""
+
+    def test_classify_timeout_as_retryable(self):
+        """超时错误分类为 RETRYABLE。"""
+        from harness.recovery import ErrorRecovery, ErrorSeverity
+        assert ErrorRecovery.classify_error(Exception("Connection timed out")) == ErrorSeverity.RETRYABLE
+        assert ErrorRecovery.classify_error("request timeout") == ErrorSeverity.RETRYABLE
+
+    def test_classify_rate_limit_as_retryable(self):
+        """限流错误分类为 RETRYABLE。"""
+        from harness.recovery import ErrorRecovery, ErrorSeverity
+        assert ErrorRecovery.classify_error(Exception("rate limit exceeded")) == ErrorSeverity.RETRYABLE
+        assert ErrorRecovery.classify_error("HTTP 429 Too Many Requests") == ErrorSeverity.RETRYABLE
+
+    def test_classify_context_length_as_degradable(self):
+        """上下文超长分类为 DEGRADABLE。"""
+        from harness.recovery import ErrorRecovery, ErrorSeverity
+        assert ErrorRecovery.classify_error(Exception("context length exceeded")) == ErrorSeverity.DEGRADABLE
+        assert ErrorRecovery.classify_error("token limit reached") == ErrorSeverity.DEGRADABLE
+
+    def test_classify_auth_error_as_fatal(self):
+        """认证错误分类为 FATAL。"""
+        from harness.recovery import ErrorRecovery, ErrorSeverity
+        assert ErrorRecovery.classify_error(Exception("invalid api key")) == ErrorSeverity.FATAL
+        assert ErrorRecovery.classify_error("HTTP 401 Unauthorized") == ErrorSeverity.FATAL
+
+    def test_classify_unknown_error_as_fatal(self):
+        """未知错误默认分类为 FATAL。"""
+        from harness.recovery import ErrorRecovery, ErrorSeverity
+        assert ErrorRecovery.classify_error(Exception("some unknown error")) == ErrorSeverity.FATAL
+
+    def test_classify_with_string_input(self):
+        """支持字符串输入分类。"""
+        from harness.recovery import ErrorRecovery, ErrorSeverity
+        assert ErrorRecovery.classify_error("network error connection reset") == ErrorSeverity.RETRYABLE
+
+    def test_compute_delay_exponential(self):
+        """指数退避延迟计算。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery(base_delay=1.0, max_delay=30.0)
+        assert recovery._compute_delay(1) == 1.0
+        assert recovery._compute_delay(2) == 2.0
+        assert recovery._compute_delay(3) == 4.0
+        assert recovery._compute_delay(4) == 8.0
+
+    def test_compute_delay_capped(self):
+        """延迟上限约束。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery(base_delay=1.0, max_delay=5.0)
+        assert recovery._compute_delay(10) == 5.0
+
+    def test_sync_retryable_error_recovers(self):
+        """同步模式：可重试错误恢复成功。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery(max_retries=3, base_delay=0.01)
+        call_count = [0]
+
+        def flaky_func():
+            call_count[0] += 1
+            if call_count[0] < 3:
+                raise Exception("connection timeout")
+            return "success"
+
+        result = recovery.execute_sync_with_recovery(flaky_func)
+        assert result == "success"
+        assert call_count[0] == 3
+        assert recovery.retry_count >= 2
+
+    def test_sync_fatal_error_raises_immediately(self):
+        """同步模式：致命错误立即抛出。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery(max_retries=3, base_delay=0.01)
+        call_count = [0]
+
+        def fatal_func():
+            call_count[0] += 1
+            raise Exception("invalid api key")
+
+        with pytest.raises(Exception, match="invalid api key"):
+            recovery.execute_sync_with_recovery(fatal_func)
+        assert call_count[0] == 1  # 只调用一次，不重试
+        assert recovery.fatal_count == 1
+
+    def test_sync_degradable_fallback(self):
+        """同步模式：可降级错误使用降级函数。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery(max_retries=3, base_delay=0.01)
+
+        def main_func():
+            raise Exception("context length exceeded")
+
+        def fallback_func():
+            return "fallback result"
+
+        result = recovery.execute_sync_with_recovery(main_func, fallback_func=fallback_func)
+        assert result == "fallback result"
+        assert recovery.fallback_count == 1
+
+    def test_sync_exhaust_retries(self):
+        """同步模式：重试耗尽后抛出。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery(max_retries=2, base_delay=0.01)
+
+        def always_fail():
+            raise Exception("connection timeout")
+
+        with pytest.raises(Exception, match="connection timeout"):
+            recovery.execute_sync_with_recovery(always_fail)
+
+    def test_get_stats(self):
+        """获取统计信息。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery()
+        stats = recovery.get_stats()
+        assert stats == {"retry_count": 0, "fallback_count": 0, "fatal_count": 0}
+
+    def test_reset_stats(self):
+        """重置统计。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery()
+
+        def fail():
+            raise Exception("invalid api key")
+
+        try:
+            recovery.execute_sync_with_recovery(fail)
+        except Exception:
+            pass
+        assert recovery.fatal_count == 1
+
+        recovery.reset_stats()
+        assert recovery.get_stats()["fatal_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_async_retryable_error_recovers(self):
+        """异步模式：可重试错误恢复成功。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery(max_retries=3, base_delay=0.01)
+        call_count = [0]
+
+        async def flaky_func():
+            call_count[0] += 1
+            if call_count[0] < 3:
+                raise Exception("connection timeout")
+            return "async success"
+
+        result = await recovery.execute_with_recovery(flaky_func)
+        assert result == "async success"
+        assert call_count[0] == 3
+
+    @pytest.mark.asyncio
+    async def test_async_fatal_error_raises_immediately(self):
+        """异步模式：致命错误立即抛出。"""
+        from harness.recovery import ErrorRecovery
+        recovery = ErrorRecovery(max_retries=3, base_delay=0.01)
+        call_count = [0]
+
+        async def fatal_func():
+            call_count[0] += 1
+            raise Exception("invalid api key")
+
+        with pytest.raises(Exception, match="invalid api key"):
+            await recovery.execute_with_recovery(fatal_func)
+        assert call_count[0] == 1
+
+
+class TestSandbox:
+    """测试 Sandbox 路径安全沙箱。"""
+
+    def test_path_safe_within_allowed(self):
+        """允许目录内的路径安全。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            safe_path = os.path.join(tmpdir, "test.txt")
+            assert sandbox.is_path_safe(safe_path) is True
+
+    def test_path_safe_outside_allowed(self):
+        """允许目录外的路径被拒绝。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            assert sandbox.is_path_safe("/etc/passwd") is False
+            assert sandbox.is_path_safe("C:\\Windows\\System32") is False
+
+    def test_path_safe_parent_traversal(self):
+        """路径穿越攻击被拒绝。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            assert sandbox.is_path_safe(os.path.join(tmpdir, "../etc/passwd")) is False
+
+    def test_safe_read_file(self):
+        """安全读取允许目录内的文件。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            test_file = os.path.join(tmpdir, "readme.txt")
+            with open(test_file, "w", encoding="utf-8") as f:
+                f.write("Hello Sandbox")
+            content = sandbox.safe_read_file(test_file)
+            assert content == "Hello Sandbox"
+
+    def test_safe_read_file_permission_denied(self):
+        """安全读取不允许目录外的文件抛出 PermissionError。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            with pytest.raises(PermissionError, match="沙箱拒绝"):
+                sandbox.safe_read_file("/etc/passwd")
+
+    def test_safe_write_file(self):
+        """安全写入文件到允许目录。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            test_file = os.path.join(tmpdir, "output.txt")
+            sandbox.safe_write_file(test_file, "Hello World")
+            with open(test_file, "r", encoding="utf-8") as f:
+                assert f.read() == "Hello World"
+
+    def test_safe_write_file_permission_denied(self):
+        """安全写入不允许目录外的文件抛出 PermissionError。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            with pytest.raises(PermissionError, match="沙箱拒绝"):
+                sandbox.safe_write_file("/etc/hacked", "malicious")
+
+    def test_safe_list_directory(self):
+        """安全列出目录内容。"""
+        import tempfile
+        from pathlib import Path
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            # 创建一些文件
+            for name in ["a.txt", "b.txt", "c.txt"]:
+                Path(tmpdir, name).touch()
+            files = sandbox.safe_list_directory(tmpdir)
+            assert "a.txt" in files
+            assert "b.txt" in files
+            assert "c.txt" in files
+
+    def test_safe_list_directory_permission_denied(self):
+        """安全列出不允许目录抛出 PermissionError。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([tmpdir])
+            with pytest.raises(PermissionError, match="沙箱拒绝"):
+                sandbox.safe_list_directory("/etc")
+
+    def test_is_command_blocked(self):
+        """命令阻止列表检查。"""
+        from harness.sandbox import Sandbox
+        sandbox = Sandbox(["./workspace"])
+        assert sandbox.is_command_blocked("rm -rf /", ["rm -rf", "format"]) is True
+        assert sandbox.is_command_blocked("format C:", ["rm -rf", "format"]) is True
+        assert sandbox.is_command_blocked("dir", ["rm -rf", "format"]) is False
+
+    def test_is_command_blocked_case_insensitive(self):
+        """命令阻止检查不区分大小写。"""
+        from harness.sandbox import Sandbox
+        sandbox = Sandbox(["./workspace"])
+        assert sandbox.is_command_blocked("RM -RF /", ["rm -rf"]) is True
+        assert sandbox.is_command_blocked("Format C:", ["format"]) is True
+
+    def test_sanitize_path_null_byte(self):
+        """sanitize_path 移除空字节。"""
+        from harness.sandbox import Sandbox
+        sandbox = Sandbox(["./workspace"])
+        result = sandbox.sanitize_path("test.txt\0extra")
+        assert "\0" not in result
+
+    def test_sanitize_path_normalize(self):
+        """sanitize_path 规范化路径。"""
+        from harness.sandbox import Sandbox
+        sandbox = Sandbox(["./workspace"])
+        result = sandbox.sanitize_path("./workspace/../workspace/test.txt")
+        assert ".." not in result
+
+    def test_is_safe_command(self):
+        """is_safe_command 检查。"""
+        from harness.sandbox import Sandbox
+        sandbox = Sandbox(["./workspace"])
+        assert sandbox.is_safe_command("ls -la", ["rm -rf", "format"]) is True
+        assert sandbox.is_safe_command("rm -rf /", ["rm -rf", "format"]) is False
+
+    def test_add_and_remove_allowed_directory(self):
+        """动态添加和移除允许目录。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sandbox = Sandbox([])  # 初始无允许目录
+            new_dir = os.path.join(tmpdir, "new_allowed")
+            sandbox.add_allowed_directory(new_dir)
+            assert sandbox.is_path_safe(os.path.join(new_dir, "test.txt")) is True
+            sandbox.remove_allowed_directory(new_dir)
+            assert sandbox.is_path_safe(os.path.join(new_dir, "test.txt")) is False
+
+    def test_multiple_allowed_dirs(self):
+        """多个允许目录。"""
+        import tempfile
+        from harness.sandbox import Sandbox
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dir1 = os.path.join(tmpdir, "dir1")
+            dir2 = os.path.join(tmpdir, "dir2")
+            sandbox = Sandbox([dir1, dir2])
+            assert sandbox.is_path_safe(os.path.join(dir1, "a.txt")) is True
+            assert sandbox.is_path_safe(os.path.join(dir2, "b.txt")) is True
+            assert sandbox.is_path_safe(os.path.join(tmpdir, "c.txt")) is False
+
+
+# ============================================================================
 # 直接运行入口
 # ============================================================================
 
