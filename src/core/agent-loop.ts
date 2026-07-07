@@ -5,7 +5,177 @@ import { shouldStop } from './stop-detector.js';
 import type { DriftDetector } from './drift-detector.js';
 import { interceptFinish } from './finish-interceptor.js';
 import type { LLMProviderChain } from '../llm/provider-chain.js';
-import type { Message } from '../llm/provider.js';
+import type { Message, ToolDefinition } from '../llm/provider.js';
+import { log, LogLevel } from '../cli/output.js';
+
+const TOOLS: ToolDefinition[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'read_file',
+      description: 'Read a file from the workspace',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'File path relative to workspace root' },
+          offset: { type: 'number', description: 'Line number to start reading from' },
+          limit: { type: 'number', description: 'Maximum number of lines to read' },
+        },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'write_file',
+      description: 'Create or overwrite a file in the workspace',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'File path relative to workspace root' },
+          content: { type: 'string', description: 'File content to write' },
+        },
+        required: ['path', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_file',
+      description: 'Delete a file from the workspace',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'File path relative to workspace root' },
+        },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_dir',
+      description: 'List files and directories in a directory',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Directory path relative to workspace root' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_file',
+      description: 'Search for files by glob pattern',
+      parameters: {
+        type: 'object',
+        properties: {
+          pattern: { type: 'string', description: 'Glob pattern (e.g. **/*.ts)' },
+          path: { type: 'string', description: 'Directory to search in' },
+        },
+        required: ['pattern'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'grep',
+      description: 'Search file contents using regex',
+      parameters: {
+        type: 'object',
+        properties: {
+          pattern: { type: 'string', description: 'Regex pattern to search for' },
+          path: { type: 'string', description: 'Directory to search in' },
+          include: { type: 'string', description: 'File pattern filter (e.g. *.ts)' },
+        },
+        required: ['pattern'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_command',
+      description: 'Execute a shell command in the workspace',
+      parameters: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'The shell command to execute' },
+        },
+        required: ['command'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_tests',
+      description: 'Run the project test suite',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_lint',
+      description: 'Run the project linter',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_type_check',
+      description: 'Run TypeScript type checking',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'finish',
+      description: 'Mark the task as complete',
+      parameters: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', description: 'Whether the task was successful' },
+          summary: { type: 'string', description: 'Summary of what was done' },
+        },
+        required: ['success', 'summary'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ask_user',
+      description: 'Ask the user a question before proceeding',
+      parameters: {
+        type: 'object',
+        properties: {
+          question: { type: 'string', description: 'The question to ask' },
+          context: { type: 'string', description: 'Additional context for the question' },
+        },
+        required: ['question'],
+      },
+    },
+  },
+];
 
 export interface AgentConfig {
   task: string;
@@ -37,12 +207,21 @@ export async function runAgent(
   // Inject original task
   history.push({
     role: 'system',
-    content: `Your task: ${config.task}\nWork in workspace: ${config.workspaceRoot}`,
+    content: `You are a coding agent. You MUST use the provided tools to complete tasks. 
+Rules:
+1. Use tools immediately - do NOT chat or ask questions unless absolutely necessary
+2. When the task is done, call finish with success=true and a brief summary
+3. If the task is just a greeting or simple question, respond with tool calls (like list_dir to understand context) then finish quickly
+4. Keep responses concise - your text content will be shown to the user as your thinking process
+5. Work in workspace: ${config.workspaceRoot}
+
+Task: ${config.task}`,
   });
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     round++;
+    log(`→ 第${round}轮/${config.maxRounds}`, LogLevel.INFO);
 
     // Stop check
     if (round > 1) {
@@ -73,13 +252,14 @@ export async function runAgent(
     // Call LLM
     let response;
     try {
-      response = await llmChain.chat(history);
+      response = await llmChain.chat(history, { tools: TOOLS });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      log(`LLM error: ${error.message}`, LogLevel.ERROR);
       return {
         success: false,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        summary: `LLM error: ${err.message}`,
+        summary: `LLM error: ${error.message}`,
         exitCode: 2,
         rounds: round,
       };
@@ -87,6 +267,15 @@ export async function runAgent(
 
     // Add assistant response to history
     history.push(response.message);
+
+    // Log the LLM's response
+    if (response.message.content) {
+      log(`  ${response.message.content.substring(0, 200)}`, LogLevel.INFO);
+    }
+    if (response.message.toolCalls && response.message.toolCalls.length > 0) {
+      const tc = response.message.toolCalls[0];
+      log(`  → ${tc.name}(${JSON.stringify(tc.arguments).substring(0, 100)})`, LogLevel.INFO);
+    }
 
     // Parse action from tool calls
     let parseResult: ParseResult = { success: false, error: 'No tool calls in response' };
@@ -110,7 +299,7 @@ export async function runAgent(
           content: `Parse error: ${parseResult.error}. Please fix the action format.`,
         });
         try {
-          response = await llmChain.chat(history);
+          response = await llmChain.chat(history, { tools: TOOLS });
           history.push(response.message);
           if (response.message.toolCalls?.[0]) {
             const retryTc = response.message.toolCalls[0];
@@ -178,15 +367,26 @@ export async function runAgent(
     try {
       execResult = await dispatchAction(action, config.workspaceRoot);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
       execResult = {
         action,
         success: false,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        error: err.message,
+        error: error.message,
         duration: 0,
       };
     }
+
+    const actionLabel =
+      action.type === 'run_command'
+        ? `shell: ${(action as { command: string }).command}`
+        : `${action.type} ${(action as { path?: string }).path ?? ''}`;
+    log(
+      execResult.success
+        ? `✓ ${actionLabel} (${execResult.duration}ms)`
+        : `✗ ${actionLabel} (${execResult.duration}ms) - ${execResult.error}`,
+      execResult.success ? LogLevel.SUCCESS : LogLevel.ERROR,
+    );
 
     // Add execution result to history
     history.push({

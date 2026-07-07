@@ -3,6 +3,7 @@ import os from 'os';
 import fs from 'fs/promises';
 import { fileExists } from '../utils/fileops.js';
 import { setCredential } from '../utils/credential.js';
+import { loadConfig } from '../config/loader.js';
 import { log, LogLevel } from './output.js';
 
 export async function runSetupWizard(): Promise<boolean> {
@@ -64,6 +65,20 @@ export async function showKeyStatus(): Promise<void> {
     log(`${provider}: ${status}`, LogLevel.INFO);
   }
   log('ollama: no credentials needed', LogLevel.INFO);
+
+  // Show custom provider key status
+  try {
+    const cwd = process.cwd();
+    const config = await loadConfig({ workspaceRoot: cwd });
+    const customProviders = config.llm.customProviders ?? [];
+    for (const cp of customProviders) {
+      const credential = await getCredentialSafe(`custom-${cp.name}`);
+      const status = credential ? 'configured' : 'not configured';
+      log(`custom-${cp.name}: ${status}`, LogLevel.INFO);
+    }
+  } catch {
+    // Config not available, skip custom providers
+  }
 }
 
 export async function clearKey(provider: string): Promise<void> {

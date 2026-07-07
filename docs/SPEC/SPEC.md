@@ -760,6 +760,117 @@ llm:
 
 ---
 
+### 3.12 自定义 OpenAI 兼容提供商
+
+**动机**：开发者经常使用第三方 OpenAI 兼容 API（如 DeepSeek、vLLM、LM Studio、OneAPI 等），需要支持通过自定义 Base URL 接入任意兼容服务。
+
+**3.12.1 提供商类型**
+
+新增 `openai-compatible` 提供商类型，复用 `OpenAIProvider` 适配器。与 `openai` 的区别仅在于：
+- 必须配置 `baseUrl`（指向兼容 API 的 Base URL）
+- 凭据 key 名为 `custom-<name>` 或 `openai-compatible`
+- 模型名由用户自行指定
+
+**3.12.2 配置格式**
+
+```yaml
+llm:
+  provider: openai-compatible
+  model: deepseek-v4-pro
+  baseUrl: https://njusehub.info/v1
+
+  customProviders:
+    - name: vllm-prod
+      baseUrl: http://10.0.0.5:8000/v1
+      model: qwen2.5-72b
+      contextWindow: 32768
+
+    - name: lmstudio-local
+      baseUrl: http://localhost:1234/v1
+      model: local-model
+```
+
+**3.12.3 CLI 管理命令**
+
+```bash
+codeharness provider add <name> --base-url <url> --model <model>
+codeharness provider remove <name>
+codeharness provider list
+codeharness key set custom-<name>
+```
+
+**3.12.4 Base URL 自动拼接**
+
+`baseURL` 配置为 Base URL 时（如 `https://njusehub.info/v1`），自动拼接 `/chat/completions` 路径。已包含完整路径的 Base URL 保持不变。
+
+---
+
+### 3.13 交互式对话模式
+
+**动机**：除了任务执行模式（`run`），开发者也需要类似 ChatGPT 的交互式对话体验，用于快速问答、代码咨询等场景。
+
+**3.13.1 基本用法**
+
+```bash
+codeharness chat                          # 使用默认配置进入对话
+codeharness chat --model gpt-4o           # 覆盖模型
+codeharness chat --resume <id>            # 恢复历史会话
+```
+
+**3.13.2 对话内 Slash 命令**
+
+| 命令 | 功能 |
+|------|------|
+| `/new` | 开始新对话 |
+| `/list` | 列出所有会话 |
+| `/save` | 保存当前对话 |
+| `/clear` | 清空上下文 |
+| `/export [path]` | 导出当前对话 |
+| `/history` | 查看对话历史 |
+| `/help` | 显示帮助 |
+| `exit` / `quit` | 退出（自动保存） |
+
+**3.13.3 会话管理 CLI 命令**
+
+```bash
+codeharness chat --list              # 列出所有会话
+codeharness chat --resume <id>       # 恢复历史会话
+codeharness chat --delete <id>       # 删除会话
+codeharness chat --export <id>       # 导出会话到文件
+codeharness chat --import <file>     # 从文件导入会话
+```
+
+**3.13.4 会话存储**
+
+会话自动保存到 `~/.codeharness/conversations/<id>.json`，每次对话后自动更新标题和内容。标题从第一条用户消息截取前 50 字符。
+
+---
+
+### 3.14 配置管理命令
+
+**动机**：避免每次运行 `codeharness run` 都需要手动指定 `--provider` 和 `--model`。
+
+```bash
+codeharness config set provider openai-compatible
+codeharness config set model deepseek-v4-pro
+codeharness config show                    # 查看当前配置
+```
+
+配置直接写入 `~/.codeharness/config.yaml`，`run` 和 `chat` 命令自动使用默认值。
+
+---
+
+### 3.15 Agent Loop 工具定义
+
+Agent 主循环启动时传入 12 种工具的函数定义（含参数 Schema），LLM 根据工具定义返回对应的 Tool Call。每轮执行日志输出 LLM 的文字回复和工具调用过程。
+
+系统提示规则：
+1. 直接使用工具完成任务，不闲聊
+2. 任务完成后立即调用 finish
+3. 回复简洁，文字内容作为思考过程展示给用户
+
+---
+
 ## 4. 非功能性需求
 
 ### 4.1 安全性
@@ -1675,10 +1786,11 @@ npx codeharness "修复 TypeScript 类型错误"
 |------|------|---------|------|-----------|
 | 1.0 | 2026-07-07 | - | 初始版本（经两轮 brainstorming 后冻结） | 全部 |
 | 2.0 | 2026-07-07 | P2 增量更新 | 第三轮 brainstorming 新增 22 个问题的设计决策，涵盖：系统提示、目标漂移防护、运行时 UX、LLM 调用策略、测试策略、可观测性、首次运行体验、版本管理、边界情况、SPEC 冻结流程 | §3.6-§3.11, §4.3-§4.4, §5.2-§5.4, §6.1-§6.3, §8.2-§8.5, §9.2, §10.1-§10.2, §11.1-§11.2, §12 |
+| 2.1 | 2026-07-07 | P1 功能增量 | 新增自定义 OpenAI 兼容提供商支持、配置管理命令、交互式对话模式、对话会话管理、Agent Loop 工具定义与日志增强、提供商链错误日志增强 | §3.12-§3.13, §8.6, §12 |
 
 ---
 
-> **文档版本**：v2.0  
+> **文档版本**：v2.1  
 > **最后更新**：2026-07-07  
 > **三轮 brainstorming 共覆盖 55 个问题**，设计细节已充分展开，SPEC 进入冻结状态。  
 > **冻结后修改规则**：P0（安全漏洞）/ P1（功能缺失）/ P2（设计矛盾）允许修改，需更新变更历史并评估对 PLAN.md 的影响。P3/P4 级别问题记录为后续版本需求。  

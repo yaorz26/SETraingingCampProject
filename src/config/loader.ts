@@ -135,46 +135,100 @@ function parseEnvValue(value: string): unknown {
   return value;
 }
 
-function parseYaml(content: string): unknown {
-  // Simple YAML parser for the config structure
+export function parseYaml(content: string): unknown {
   const lines = content.split('\n');
   const result: Record<string, unknown> = {};
-  const stack: Array<{ obj: Record<string, unknown>; indent: number }> = [
-    { obj: result, indent: -1 },
-  ];
+  const stack: Array<{
+    container: Record<string, unknown> | unknown[];
+    indent: number;
+    parentKey?: string;
+  }> = [{ container: result, indent: -1 }];
 
   for (const line of lines) {
     const trimmed = line.trimEnd();
     if (trimmed === '' || trimmed.startsWith('#')) continue;
 
     const indent = line.length - line.trimStart().length;
-    const colonIndex = trimmed.indexOf(':');
-    if (colonIndex === -1) continue;
+    const isArrayItem = trimmed.trimStart().startsWith('- ');
 
-    const key = trimmed.slice(0, colonIndex).trim();
-    const value = trimmed.slice(colonIndex + 1).trim();
-
-    // Pop stack to appropriate indent level
-    while (stack.length > 1 && stack[stack.length - 1].indent >= indent) {
+    // Pop stack to appropriate indent level (only deeper entries)
+    while (stack.length > 1 && stack[stack.length - 1].indent > indent) {
+      stack.pop();
+    }
+    // For non-array sibling keys at same indent, pop the previous sibling
+    if (!isArrayItem && stack.length > 1 && stack[stack.length - 1].indent === indent) {
       stack.pop();
     }
 
-    const current = stack[stack.length - 1].obj;
+    const top = stack[stack.length - 1];
+    const current = top.container;
 
-    if (value === '') {
-      // Nested object
-      const nested: Record<string, unknown> = {};
-      current[key] = nested;
-      stack.push({ obj: nested, indent });
-    } else if (value.startsWith('- ')) {
-      // Array item
-      const itemValue = value.slice(2).trim();
-      if (!Array.isArray(current[key])) {
-        current[key] = [];
+    if (isArrayItem) {
+      const itemContent = trimmed.trimStart().slice(2).trim();
+      const colonIndex = itemContent.indexOf(':');
+
+      // If current is an object (not array), convert it to an array
+      // This happens when a key like "customProviders:" creates {} first,
+      // then we encounter "- name: ..." which indicates it should be an array
+      if (!Array.isArray(current) && stack.length >= 2) {
+        const parentEntry = stack[stack.length - 2];
+        const parentKey = top.parentKey;
+        if (parentKey && parentEntry && !Array.isArray(parentEntry.container)) {
+          const container = parentEntry.container as Record<string, unknown>;
+          container[parentKey] = [];
+          top.container = container[parentKey] as unknown[];
+        }
       }
-      (current[key] as unknown[]).push(parseYamlValue(itemValue));
+
+      const arr = top.container as unknown[];
+
+      if (colonIndex === -1) {
+        // Simple array value: "- value"
+        arr.push(parseYamlValue(itemContent));
+      } else {
+        const itemKey = itemContent.slice(0, colonIndex).trim();
+        const itemVal = itemContent.slice(colonIndex + 1).trim();
+
+        if (itemVal === '') {
+          // "- key:" → start of nested object in array
+          const arrObj: Record<string, unknown> = {};
+          arr.push(arrObj);
+          stack.push({ container: arrObj, indent, parentKey: itemKey });
+        } else {
+          // "- key: value" → simple object in array
+          const arrObj: Record<string, unknown> = { [itemKey]: parseYamlValue(itemVal) };
+          arr.push(arrObj);
+          // Push to stack so subsequent indented lines can add properties
+          stack.push({ container: arrObj, indent });
+        }
+      }
     } else {
-      current[key] = parseYamlValue(value);
+      // Regular key: value line
+      const colonIndex = trimmed.indexOf(':');
+      if (colonIndex === -1) continue;
+
+      const key = trimmed.slice(0, colonIndex).trim();
+      const rawValue = trimmed.slice(colonIndex + 1).trim();
+
+      if (Array.isArray(current)) {
+        // Property of the last array item object
+        const lastObj = current[current.length - 1] as Record<string, unknown>;
+        if (rawValue === '') {
+          const nested: Record<string, unknown> = {};
+          lastObj[key] = nested;
+          stack.push({ container: nested, indent, parentKey: key });
+        } else {
+          lastObj[key] = parseYamlValue(rawValue);
+        }
+      } else {
+        if (rawValue === '') {
+          const nested: Record<string, unknown> = {};
+          current[key] = nested;
+          stack.push({ container: nested, indent, parentKey: key });
+        } else {
+          current[key] = parseYamlValue(rawValue);
+        }
+      }
     }
   }
 

@@ -7,6 +7,25 @@ import type { Config } from '../../../src/config/schema.js';
 
 describe('loadConfig', () => {
   let testDir: string;
+  const globalConfigPath = path.join(os.homedir(), '.codeharness', 'config.yaml');
+  const backupPath = path.join(os.homedir(), '.codeharness', 'config.yaml.bak');
+
+  beforeAll(async () => {
+    // Temporarily move global config to avoid interference
+    try {
+      await fs.rename(globalConfigPath, backupPath);
+    } catch {
+      // No global config exists
+    }
+  });
+
+  afterAll(async () => {
+    try {
+      await fs.rename(backupPath, globalConfigPath);
+    } catch {
+      // No backup exists
+    }
+  });
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `codeharness-config-${randomUUID()}`);

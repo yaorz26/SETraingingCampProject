@@ -1,15 +1,29 @@
 import { z } from 'zod';
 
-const fallbackSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'ollama']),
+const customProviderSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(32)
+    .regex(/^[a-z0-9_-]+$/),
+  baseUrl: z.string().min(1),
   model: z.string().min(1),
+  apiKey: z.string().optional(),
+  contextWindow: z.number().int().positive().optional(),
+});
+
+const fallbackSchema = z.object({
+  provider: z.enum(['openai', 'anthropic', 'ollama', 'openai-compatible']),
+  model: z.string().min(1),
+  baseUrl: z.string().optional(),
 });
 
 const llmSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'ollama']),
+  provider: z.enum(['openai', 'anthropic', 'ollama', 'openai-compatible']),
   model: z.string(),
   baseUrl: z.string().optional(),
   fallbacks: z.array(fallbackSchema),
+  customProviders: z.array(customProviderSchema).optional(),
 });
 
 const workspaceSchema = z.object({
@@ -58,13 +72,28 @@ export const configSchema = z.object({
   context: contextSchema.partial().optional(),
 });
 
+export interface CustomProviderConfig {
+  name: string;
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+  contextWindow?: number;
+}
+
+export interface FallbackConfig {
+  provider: string;
+  model: string;
+  baseUrl?: string;
+}
+
 export interface Config {
   version: number;
   llm: {
     provider: string;
     model: string;
     baseUrl?: string;
-    fallbacks: Array<{ provider: string; model: string }>;
+    fallbacks: FallbackConfig[];
+    customProviders?: CustomProviderConfig[];
   };
   workspace: { root: string };
   guardrails: {
@@ -148,6 +177,7 @@ function mergeDefaults(partial: z.infer<typeof configSchema>): Config {
       model: partial.llm?.model ?? DEFAULT_CONFIG.llm.model,
       baseUrl: partial.llm?.baseUrl,
       fallbacks: partial.llm?.fallbacks ?? DEFAULT_CONFIG.llm.fallbacks,
+      customProviders: partial.llm?.customProviders,
     },
     workspace: {
       root: partial.workspace?.root ?? DEFAULT_CONFIG.workspace.root,

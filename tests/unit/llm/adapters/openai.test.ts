@@ -18,7 +18,13 @@ function mockResponse(body: unknown, status = 200): Response {
 }
 
 describe('OpenAIProvider', () => {
-  let OpenAIProvider: new (config?: { model?: string; contextWindow?: number }) => {
+  let OpenAIProvider: new (config?: {
+    model?: string;
+    contextWindow?: number;
+    baseURL?: string;
+    credentialKey?: string;
+    apiKey?: string;
+  }) => {
     name: string;
     supportsToolUse: boolean;
     contextWindow: number;
@@ -67,6 +73,23 @@ describe('OpenAIProvider', () => {
         contextWindow: 128000,
       });
       expect(provider.contextWindow).toBe(128000);
+    });
+
+    it('should set name to openai-compatible when credentialKey is custom', () => {
+      const provider = new OpenAIProvider({
+        model: 'qwen2.5-72b',
+        baseURL: 'http://localhost:8000/v1/chat/completions',
+        credentialKey: 'custom-vllm',
+      });
+      expect(provider.name).toBe('openai-compatible');
+    });
+
+    it('should use custom baseURL', () => {
+      const provider = new OpenAIProvider({
+        model: 'local-model',
+        baseURL: 'http://localhost:1234/v1/chat/completions',
+      });
+      expect(provider.name).toBe('openai');
     });
   });
 

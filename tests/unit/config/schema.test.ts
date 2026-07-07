@@ -78,4 +78,55 @@ describe('validateConfig', () => {
     const skipResult = validateConfig({ interaction: { dangerPolicy: 'skip' } });
     expect(skipResult.success).toBe(true);
   });
+
+  it('should accept openai-compatible provider', () => {
+    const result = validateConfig({
+      llm: { provider: 'openai-compatible', model: 'qwen2.5-72b' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept customProviders configuration', () => {
+    const result = validateConfig({
+      llm: {
+        provider: 'openai-compatible',
+        model: 'qwen2.5-72b',
+        customProviders: [
+          { name: 'vllm', baseUrl: 'http://localhost:8000/v1', model: 'qwen2.5-72b' },
+          { name: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model' },
+        ],
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.llm.customProviders).toHaveLength(2);
+      expect(result.data.llm.customProviders![0].name).toBe('vllm');
+    }
+  });
+
+  it('should reject invalid customProvider name', () => {
+    const result = validateConfig({
+      llm: {
+        customProviders: [
+          { name: 'invalid name!', baseUrl: 'http://localhost:8000/v1', model: 'test' },
+        ],
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept fallback with openai-compatible and baseUrl', () => {
+    const result = validateConfig({
+      llm: {
+        fallbacks: [
+          {
+            provider: 'openai-compatible',
+            model: 'qwen2.5-14b',
+            baseUrl: 'http://10.0.0.6:8000/v1',
+          },
+        ],
+      },
+    });
+    expect(result.success).toBe(true);
+  });
 });

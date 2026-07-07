@@ -49,7 +49,7 @@ export class ApprovalStateMachine {
           durationMs: Date.now() - startTime,
         };
         resolve(result);
-        return result;
+        return Promise.resolve(result);
       });
     });
   }

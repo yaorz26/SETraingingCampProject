@@ -9,6 +9,9 @@ describe('CLI commands', () => {
     expect(output).toContain('init');
     expect(output).toContain('setup');
     expect(output).toContain('key');
+    expect(output).toContain('provider');
+    expect(output).toContain('chat');
+    expect(output).toContain('config');
   });
 
   it('should include version information', () => {

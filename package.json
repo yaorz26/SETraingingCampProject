@@ -2,9 +2,9 @@
   "name": "codeharness",
   "version": "1.0.0",
   "description": "AI Coding Agent Harness - A governance framework for AI coding agents",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "bin": {
-    "codeharness": "./dist/index.js"
+    "codeharness": "./dist/src/index.js"
   },
   "scripts": {
     "test": "jest --passWithNoTests",
@@ -33,7 +33,7 @@
   "license": "ISC",
   "type": "module",
   "files": [
-    "dist/",
+    "dist/src/",
     "README.md"
   ],
   "engines": {

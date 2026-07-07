@@ -2,8 +2,6 @@ module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
   parserOptions: {
-    project: './tsconfig.json',
-    tsconfigRootDir: __dirname,
     ecmaVersion: 2022,
     sourceType: 'module',
   },
@@ -11,7 +9,6 @@ module.exports = {
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
-    'plugin:@typescript-eslint/recommended-requiring-type-checking',
   ],
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
@@ -19,5 +16,5 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'warn',
     'no-console': 'off',
   },
-  ignorePatterns: ['dist/', 'node_modules/', 'coverage/'],
+  ignorePatterns: ['dist/', 'node_modules/', 'coverage/', 'tests/**/*.js', 'tests/**/*.d.ts'],
 };

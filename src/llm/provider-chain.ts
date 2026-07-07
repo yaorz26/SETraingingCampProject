@@ -1,4 +1,5 @@
 import type { LLMProvider, Message, ChatOptions, ChatResponse } from './provider.js';
+import { log, LogLevel } from '../cli/output.js';
 
 function isRetryableError(err: unknown): boolean {
   if (err instanceof Error) {
@@ -37,6 +38,7 @@ export class LLMProviderChain implements LLMProvider {
   }
 
   async chat(messages: Message[], options?: ChatOptions): Promise<ChatResponse> {
+    const errors: string[] = [];
     for (let i = this.currentIndex; i < this.providers.length; i++) {
       try {
         const response = await this.providers[i].chat(messages, options);
@@ -45,6 +47,9 @@ export class LLMProviderChain implements LLMProvider {
         }
         return response;
       } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`${this.providers[i].name}: ${msg}`);
+        log(`Provider ${this.providers[i].name} failed: ${msg}`, LogLevel.WARNING);
         if (isRetryableError(err) && i < this.providers.length - 1) {
           continue;
         }
@@ -54,7 +59,7 @@ export class LLMProviderChain implements LLMProvider {
         throw err;
       }
     }
-    throw new Error('所有 LLM 供应商均不可用');
+    throw new Error(`所有 LLM 供应商均不可用\n${errors.join('\n')}`);
   }
 
   async countTokens(messages: Message[]): Promise<number> {

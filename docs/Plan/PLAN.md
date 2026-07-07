@@ -1011,10 +1011,10 @@ T0.1 (脚手架)
 
 ---
 
-> **文档版本**：v2.0  
+> **文档版本**：v2.1  
 > **最后更新**：2026-07-07  
 > **基于 SPEC**：docs/SPEC/SPEC.md v2.0  
-> **总计 Tasks**：44 个（原 31 个 + 新增 13 个），预计执行时间 6-8 小时（含测试编写）
+> **总计 Tasks**：52 个（原 44 个 + 新增 8 个）
 
 ---
 
@@ -1044,3 +1044,111 @@ T0.1 (脚手架)
   3. 优先改进 AI 编码智能体在使用中遇到困难的模块
   4. 跟踪改进前后的任务完成率变化
 - **验证**：`docs/dogfooding/` 目录下至少有 3 份体验报告
+
+---
+
+## 阶段 12：自定义提供商与交互增强
+
+> **背景**：实际使用中发现需要支持 OpenAI 兼容的第三方 API（如 DeepSeek、vLLM、LM Studio 等），以及更便捷的配置管理和交互式对话模式。
+
+### ✅ T12.1 — 自定义 OpenAI 兼容提供商
+
+- **目标**：支持通过 Base URL 添加任意 OpenAI 兼容的第三方 LLM 服务
+- **涉及文件**：`src/config/schema.ts`, `src/llm/adapters/openai.ts`, `src/cli/commands.ts`, `src/cli/setup-wizard.ts`, `src/config/loader.ts`
+- **实现要点**：
+  1. 新增 `openai-compatible` 提供商类型，复用 `OpenAIProvider` 适配器
+  2. 配置 Schema 新增 `customProviderSchema`（name, baseUrl, model, apiKey, contextWindow）
+  3. `OpenAIProvider` 增加 `credentialKey` 字段，支持动态凭据 key 名（`custom-<name>`）
+  4. `baseURL` 自动拼接 `/chat/completions` 路径
+  5. 支持多个自定义提供商实例，通过 `customProviders` 数组配置
+  6. CLI 新增 `provider add/remove/list` 子命令
+  7. `key` 命令支持自定义提供商凭据管理（`custom-<name>`）
+  8. YAML 解析器支持数组内嵌套对象和 `trimStart` 前缀检测
+  9. `tsconfig.json` rootDir 改为 `.`，package.json 入口路径更新
+- **验证**：`codeharness provider add vllm --base-url http://localhost:8000/v1 --model qwen2.5` 成功写入配置
+
+### ✅ T12.2 — 配置管理命令
+
+- **目标**：支持通过 CLI 设置默认 provider/model 等配置，无需手动编辑 YAML
+- **涉及文件**：`src/cli/commands.ts`
+- **实现要点**：
+  1. 新增 `config set <key> <value>` 命令（key 支持 provider, model, baseUrl）
+  2. 新增 `config show` 命令查看当前配置
+  3. 直接修改 `~/.codeharness/config.yaml` 文件
+  4. `run` 命令自动使用默认配置，无需每次指定 `--provider` 和 `--model`
+- **验证**：`codeharness config set provider openai-compatible` 后 `codeharness run` 无需额外参数
+
+### ✅ T12.3 — 交互式对话模式
+
+- **目标**：实现类似 ChatGPT 的交互式对话模式，用户直接输入自然语言
+- **涉及文件**：`src/cli/commands.ts`
+- **实现要点**：
+  1. 新增 `chat` 命令，进入交互式对话循环
+  2. 使用 `readline` 逐行读取用户输入
+  3. 每次输入直接调用 LLM 并输出回复
+  4. 输入 `exit` / `quit` 退出对话模式
+  5. 保持对话上下文（多轮对话记忆）
+  6. 支持 `--provider`、`--model`、`--base-url` 参数覆盖默认配置
+- **验证**：`codeharness chat` 进入对话模式，输入 "你好" 得到 AI 回复
+
+### ✅ T12.4 — 对话会话管理
+
+- **目标**：支持会话的持久化存储、恢复、导出和导入
+- **涉及文件**：`src/cli/conversation-store.ts`, `src/cli/commands.ts`
+- **实现要点**：
+  1. 会话存储到 `~/.codeharness/conversations/<id>.json`
+  2. 自动保存：每次对话后自动保存标题和内容
+  3. 自动标题：从第一条用户消息截取前 50 字符
+  4. CLI 管理命令：`chat --list` / `--resume <id>` / `--delete <id>` / `--export <id>` / `--import <file>`
+  5. 对话内 Slash 命令：`/new` `/list` `/save` `/clear` `/export` `/history` `/help`
+- **验证**：`chat --list` 列出已保存会话，`chat --resume <id>` 恢复历史对话
+
+### ✅ T12.5 — Agent Loop 工具定义与日志增强
+
+- **目标**：Agent 主循环传入工具定义，增加 LLM 思考过程和动作执行日志
+- **涉及文件**：`src/core/agent-loop.ts`
+- **实现要点**：
+  1. 定义 `TOOLS` 数组（12 种工具的函数定义，含参数 Schema）
+  2. LLM 调用时传入 `tools` 参数
+  3. 每轮日志输出 LLM 文字回复和工具调用
+  4. 系统提示优化：要求直接使用工具、保持简洁、快速完成
+  5. 动作执行结果日志（✓/✗ 标记、耗时）
+- **验证**：运行任务时终端显示 LLM 思考内容和工具调用过程
+
+### ✅ T12.6 — 提供商链错误日志增强
+
+- **目标**：LLM 调用失败时显示具体错误信息而非通用错误
+- **涉及文件**：`src/llm/provider-chain.ts`
+- **实现要点**：
+  1. 每次提供商失败时记录具体错误消息
+  2. 最终错误信息包含所有失败原因
+  3. 使用 `LogLevel.WARNING` 输出单个提供商失败信息
+- **验证**：API 调用失败时终端显示具体错误码和原因
+
+---
+
+| 新增模块 | 对应 Task | 说明 |
+|---------|----------|------|
+| 自定义 OpenAI 兼容提供商 | T12.1 | openai-compatible 类型，customProviderSchema，provider 管理命令 |
+| 配置管理命令 | T12.2 | config set/show，CLI 配置默认值 |
+| 交互式对话模式 | T12.3 | chat 命令，多轮对话，自然语言交互 |
+| 对话会话管理 | T12.4 | 会话持久化，恢复/导出/导入，Slash 命令 |
+| Agent Loop 工具定义 | T12.5 | TOOLS 数组，LLM 思考过程日志 |
+| 提供商链错误日志 | T12.6 | 详细错误信息输出 |
+
+| 更新模块 | 对应 Task | 变更内容 |
+|---------|----------|---------|
+| 配置 Schema | T12.1 | 新增 customProviderSchema，扩展 provider 枚举，FallbackConfig 支持 baseUrl |
+| OpenAI Provider | T12.1 | 新增 credentialKey，baseURL 自动拼接路径，name 动态化 |
+| 凭据存储 | T12.1 | 支持自定义 key 名（custom-<name>） |
+| setup-wizard | T12.1 | showKeyStatus 支持自定义提供商 |
+| YAML 解析器 | T12.1 | 支持数组内嵌套对象和 trimStart 前缀检测 |
+| tsconfig.json | T12.1 | rootDir 改为 "."，include 包含 tests/ |
+| package.json | T12.1 | main/bin 更新为 dist/src/，files 更新 |
+
+---
+
+> **文档版本**：v2.1  
+> **最后更新**：2026-07-07  
+> **基于 SPEC**：docs/SPEC/SPEC.md v2.0  
+> **总计 Tasks**：52 个（原 44 个 + 新增 8 个）

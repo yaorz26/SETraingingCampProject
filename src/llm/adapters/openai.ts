@@ -14,10 +14,12 @@ export interface OpenAIProviderConfig {
   contextWindow?: number;
   /** 自定义 base URL */
   baseURL?: string;
+  /** 凭据管理器中使用的 key 名（默认 'openai'） */
+  credentialKey?: string;
 }
 
 export class OpenAIProvider implements LLMProvider {
-  readonly name = 'openai';
+  readonly name: string;
   readonly supportsToolUse = true;
   readonly contextWindow: number;
 
@@ -28,6 +30,8 @@ export class OpenAIProvider implements LLMProvider {
     this.config = config;
     this.model = config.model ?? 'gpt-4o';
     this.contextWindow = config.contextWindow ?? 128000;
+    this.name =
+      config.credentialKey === 'openai' || !config.credentialKey ? 'openai' : 'openai-compatible';
   }
 
   async chat(messages: Message[], options?: ChatOptions): Promise<ChatResponse> {
@@ -76,10 +80,11 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   private async getApiKey(): Promise<string> {
-    const key = await getCredential('openai');
+    const keyName = this.config.credentialKey ?? 'openai';
+    const key = await getCredential(keyName);
     if (!key) {
       throw new Error(
-        'OpenAI API key not found. Please set it via `codeharness config set openai-key <key>`',
+        `API key not found for ${keyName}. Please set it via \`codeharness key set ${keyName}\``,
       );
     }
     return key;
@@ -151,7 +156,10 @@ export class OpenAIProvider implements LLMProvider {
     maxRetries = 3,
   ): Promise<any> {
     /* eslint-enable @typescript-eslint/no-explicit-any */
-    const baseURL = this.config.baseURL ?? 'https://api.openai.com/v1/chat/completions';
+    let baseURL = this.config.baseURL ?? 'https://api.openai.com/v1/chat/completions';
+    if (!baseURL.endsWith('/chat/completions')) {
+      baseURL = baseURL.replace(/\/$/, '') + '/chat/completions';
+    }
 
     let lastError: Error | null = null;
 
