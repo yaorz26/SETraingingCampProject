@@ -1,3 +1,8 @@
+---
+name: codeharness
+description: Use ONLY when working on the CodeHarness project. Covers TDD workflow, PLAN.md/SPEC.md synchronization, task execution rules, and project conventions. Triggered by tasks involving CodeHarness development.
+---
+
 # CodeHarness 项目开发 Skill
 
 > **角色**：本文档是 AI 编码智能体在 CodeHarness 项目中的行为准则。必须在每次执行任务前阅读并遵守。

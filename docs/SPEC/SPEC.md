@@ -1058,7 +1058,7 @@ codeharness/
 ├── .codeharness.yaml         # 自举：用自己管理自己
 ├── package.json
 ├── tsconfig.json
-├── jest.config.ts
+├── jest.config.cjs
 ├── .eslintrc.cjs
 ├── .prettierrc
 ├── .c8rc.json
@@ -1541,8 +1541,8 @@ npx codeharness "修复 TypeScript 类型错误"
 
 | 供应商 | 接入方式 | MVP 支持 |
 |--------|---------|---------|
-| OpenAI | 官方 SDK（`openai` npm 包），GPT-4o / GPT-4o-mini | ✅ |
-| Anthropic | 官方 SDK（`@anthropic-ai/sdk`），Claude Sonnet | ✅ |
+| OpenAI | HTTP API（`api.openai.com/v1`），GPT-4o / GPT-4o-mini | ✅ |
+| Anthropic | HTTP API（`api.anthropic.com/v1/messages`），Claude Sonnet | ✅ |
 | Ollama | OpenAI 兼容 API（`http://localhost:11434/v1`），本地模型 | ✅ |
 
 **统一策略**：所有供应商通过 Adapter 模式实现 `LLMProvider` 接口，强制要求使用 Tool Use 机制。支持降级链配置，4xx 错误不降级，同任务中不回升。
@@ -1561,10 +1561,13 @@ npx codeharness "修复 TypeScript 类型错误"
 | uuid | 任务 ID 生成 | MIT |
 | pino | 结构化日志 | MIT |
 | semver | 版本号比较 | ISC |
+| @swc/jest | Jest TypeScript 转换器 | MIT |
+| @swc/core | SWC 编译引擎（@swc/jest 依赖） | Apache-2.0 |
 
 ### 9.5 测试框架
 
 - **Jest**：单元测试 + 集成测试
+- **TypeScript 转换器**：`@swc/jest`（`@swc/core` 作为编译引擎），用于将 TypeScript 测试文件转换为 Jest 可执行的 CommonJS
 - **Mock LLM**：自定义 `MockLLMProvider`，接受预设的响应序列
 - 测试不依赖网络与真实 LLM
 

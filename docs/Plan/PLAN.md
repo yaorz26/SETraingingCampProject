@@ -8,15 +8,15 @@
 
 ## 阶段 0：项目脚手架
 
-### T0.1 — 初始化项目骨架
+### ✅ T0.1 — 初始化项目骨架
 
 - **目标**：创建 TypeScript + Jest 项目，配置编译与测试
-- **涉及文件**：`package.json`, `tsconfig.json`, `jest.config.ts`, `.eslintrc.cjs`, `.prettierrc`, `.c8rc.json`, `.gitignore`, `.gitlab-ci.yml`
+- **涉及文件**：`package.json`, `tsconfig.json`, `jest.config.cjs`, `.eslintrc.cjs`, `.prettierrc`, `.c8rc.json`, `.gitignore`, `.gitlab-ci.yml`
 - **实现要点**：
   1. `npm init` 初始化 Node.js 项目（包管理器使用 pnpm）
-  2. 安装 TypeScript、Jest、ts-jest、@types/jest、eslint、prettier、c8
+  2. 安装 TypeScript、Jest、@swc/jest、@swc/core、@types/jest、eslint、prettier、c8
   3. 配置 `tsconfig.json`（target ES2022, module NodeNext, moduleResolution NodeNext, strict true）
-  4. 配置 `jest.config.ts`（ts-jest, testMatch 指向 `tests/`）
+  4. 配置 `jest.config.cjs`（@swc/jest, testMatch 指向 `tests/`）
   5. 配置 `.eslintrc.cjs`（@typescript-eslint 严格规则集）
   6. 配置 `.prettierrc`（singleQuote: true, trailingComma: 'all'）
   7. 配置 `.c8rc.json`（include: src/**/*.ts, exclude: index.ts/setup-wizard.ts/*.d.ts/pricing.ts, lines: 80%, functions: 80%, branches: 75%, statements: 80%）
@@ -32,7 +32,7 @@
 
 ## 阶段 1：基础设施层
 
-### T1.1 — 工作区根目录检测 [P]
+### ✅ T1.1 — 工作区根目录检测 [P]
 
 - **目标**：实现 `WorkspaceDetector.detect()` 四级检测策略
 - **涉及文件**：`src/utils/workspace.ts`, `tests/unit/utils/workspace.test.ts`
@@ -48,7 +48,7 @@
   - 指定路径不存在时抛出错误
   - Python 项目（含 `pyproject.toml`）正确检测
 
-### T1.2 — Shell 命令执行器 [P]
+### ✅ T1.2 — Shell 命令执行器 [P]
 
 - **目标**：实现 `ShellExecutor` 封装子进程执行
 - **涉及文件**：`src/utils/shell.ts`, `tests/unit/utils/shell.test.ts`
@@ -67,7 +67,7 @@
   - 超时命令（如 `sleep 10`）被 kill，返回超时错误
   - 命令不存在时返回错误
 
-### T1.3 — 文件操作工具（含原子性）[P]
+### ✅ T1.3 — 文件操作工具（含原子性）[P]
 
 - **目标**：实现安全文件读写，含原子写入和备份
 - **涉及文件**：`src/tools/file-ops.ts`, `tests/unit/tools/file-ops.test.ts`
@@ -85,7 +85,7 @@
   - 旧备份被正确清理
   - 超大文件读取被拒绝
 
-### T1.4 — 凭据存储 [P]
+### ✅ T1.4 — 凭据存储 [P]
 
 - **目标**：实现 OS 钥匙串凭据管理
 - **涉及文件**：`src/utils/credential.ts`, `tests/unit/utils/credential.test.ts`
@@ -105,7 +105,7 @@
   - `hasCredential` 正确反映状态
   - 凭据值不泄露到日志
 
-### T1.5 — 日志系统（Pino 结构化日志）[P]
+### ✅ T1.5 — 日志系统（Pino 结构化日志）[P]
 
 - **目标**：实现三层日志体系（审计 / 运行 / 调试），使用 pino 输出 JSONL
 - **涉及文件**：`src/logging/audit-logger.ts`, `src/logging/runtime-logger.ts`, `tests/unit/logging/audit-logger.test.ts`
@@ -127,7 +127,7 @@
 
 ## 阶段 2：LLM 抽象层
 
-### T2.1 — LLMProvider 接口定义 [P]
+### ✅ T2.1 — LLMProvider 接口定义 [P]
 
 - **目标**：定义统一的 LLM 抽象接口
 - **涉及文件**：`src/llm/provider.ts`, `tests/unit/llm/provider.test.ts`
@@ -140,7 +140,7 @@
   - 接口类型编译通过
   - Mock 实现满足接口契约
 
-### T2.2 — MockLLMProvider 实现
+### ✅ T2.2 — MockLLMProvider 实现
 
 - **目标**：实现可控的 Mock LLM，用于所有确定性测试
 - **涉及文件**：`src/llm/mock-provider.ts`, `tests/unit/llm/mock-provider.test.ts`
@@ -157,7 +157,7 @@
   - 序列耗尽抛出错误
   - 请求历史正确记录
 
-### T2.3 — OpenAI Provider 适配器
+### ✅ T2.3 — OpenAI Provider 适配器
 
 - **目标**：实现 OpenAI API 适配器
 - **涉及文件**：`src/llm/adapters/openai.ts`, `tests/unit/llm/adapters/openai.test.ts`
@@ -176,12 +176,12 @@
   - 429 错误触发重试
   - Token 计数正确
 
-### T2.4 — Anthropic Provider 适配器 [P]
+### ✅ T2.4 — Anthropic Provider 适配器 [P]
 
 - **目标**：实现 Anthropic API 适配器
 - **涉及文件**：`src/llm/adapters/anthropic.ts`, `tests/unit/llm/adapters/anthropic.test.ts`
 - **实现要点**：
-  1. 使用 `@anthropic-ai/sdk` npm 包
+  1. 使用 Anthropic Messages API（直接 HTTP 调用，与 OpenAI adapter 保持一致）
   2. 实现 `chat()` 方法，调用 Messages API
   3. 强制使用 Tool Use
   4. 解析 Tool Use 响应
@@ -191,7 +191,7 @@
   - 使用 mock HTTP 服务器测试正常响应
   - 401 错误正确抛出
 
-### T2.5 — Ollama Provider 适配器 [P]
+### ✅ T2.5 — Ollama Provider 适配器 [P]
 
 - **目标**：实现 Ollama 本地模型适配器
 - **涉及文件**：`src/llm/adapters/ollama.ts`, `tests/unit/llm/adapters/ollama.test.ts`
@@ -204,7 +204,7 @@
   - 使用 mock HTTP 服务器测试正常响应
   - 不支持 Tool Use 时正确报错
 
-### T2.6 — LLM 降级链（LLMProviderChain）
+### ✅ T2.6 — LLM 降级链（LLMProviderChain）
 
 - **目标**：实现多供应商降级链
 - **涉及文件**：`src/llm/provider-chain.ts`, `tests/unit/llm/provider-chain.test.ts`
@@ -227,7 +227,7 @@
 
 ## 阶段 3：核心 Harness
 
-### T3.1 — 动作类型定义与 Schema 验证
+### ✅ T3.1 — 动作类型定义与 Schema 验证
 
 - **目标**：定义 12 种动作类型，实现 Schema 验证
 - **涉及文件**：`src/core/action-parser.ts`, `tests/unit/core/action-parser.test.ts`
@@ -247,7 +247,7 @@
   - 路径包含 `../` → 验证失败
   - 未知动作类型 → 解析失败
 
-### T3.2 — 动作分发器
+### ✅ T3.2 — 动作分发器
 
 - **目标**：实现所有动作的执行逻辑
 - **涉及文件**：`src/core/action-dispatcher.ts`, `tests/unit/core/action-dispatcher.test.ts`
@@ -278,7 +278,7 @@
   - 超大文件读取被拒绝
   - list_dir 超 500 条目截断
 
-### T3.3 — 停机检测器
+### ✅ T3.3 — 停机检测器
 
 - **目标**：实现所有停机条件判断逻辑
 - **涉及文件**：`src/core/stop-detector.ts`, `tests/unit/core/stop-detector.test.ts`
@@ -298,7 +298,7 @@
   - 超时 → 停机，reason = 'global_timeout'
   - 正常情况 → 不停机
 
-### T3.4 — 目标漂移检测器（DriftDetector）
+### ✅ T3.4 — 目标漂移检测器（DriftDetector）
 
 - **目标**：实现三层目标漂移防护中的代码级偏离检测
 - **涉及文件**：`src/core/drift-detector.ts`, `tests/unit/core/drift-detector.test.ts`
@@ -316,7 +316,7 @@
   - 修改无关文件 → low 风险
   - 修改配置文件 → medium 风险
 
-### T3.5 — Finish 拦截器
+### ✅ T3.5 — Finish 拦截器
 
 - **目标**：实现 finish 动作的客观验证拦截
 - **涉及文件**：`src/core/finish-interceptor.ts`, `tests/unit/core/finish-interceptor.test.ts`
@@ -331,7 +331,7 @@
   - 测试未通过 → 拦截，reason 含失败数量
   - 意外文件修改 → 拦截，reason 含文件列表
 
-### T3.6 — Agent 主循环
+### ✅ T3.6 — Agent 主循环
 
 - **目标**：串联所有模块，实现完整的 Agent 主循环
 - **涉及文件**：`src/core/agent-loop.ts`, `tests/unit/core/agent-loop.test.ts`
@@ -362,7 +362,7 @@
 
 ## 阶段 4：治理护栏（重点维度）
 
-### T4.1 — 危险模式注册表
+### ✅ T4.1 — 危险模式注册表
 
 - **目标**：实现 L1 模式匹配，8 类危险模式的检测
 - **涉及文件**：`src/guardrails/pattern-registry.ts`, `tests/unit/guardrails/pattern-registry.test.ts`
@@ -391,7 +391,7 @@
   - `sudo rm` → 命中 PRIVILEGE_ESCALATION
   - 自定义模式生效
 
-### T4.2 — 路径围栏
+### ✅ T4.2 — 路径围栏
 
 - **目标**：实现 L2 路径边界检查
 - **涉及文件**：`src/guardrails/boundary-check.ts`, `tests/unit/guardrails/boundary-check.test.ts`
@@ -409,7 +409,7 @@
   - `.env` 在工作区内 → 敏感路径硬拦截
   - 符号链接指向工作区外 → 需检测（如可能）
 
-### T4.3 — 风险分级
+### ✅ T4.3 — 风险分级
 
 - **目标**：实现 L3 风险分级逻辑
 - **涉及文件**：`src/guardrails/guardrail.ts`, `tests/unit/guardrails/guardrail.test.ts`
@@ -432,7 +432,7 @@
   - `curl \| bash` → FATAL
   - 越界访问 → FATAL，不可审批
 
-### T4.4 — HITL 审批状态机
+### ✅ T4.4 — HITL 审批状态机
 
 - **目标**：实现 L4 审批状态机和会话白名单
 - **涉及文件**：`src/guardrails/hitl.ts`, `tests/unit/guardrails/hitl.test.ts`
@@ -458,7 +458,7 @@
   - 白名单不跨会话（新建 `SessionApprovalCache` 实例）
   - 非交互模式 `deny` → 自动拒绝
 
-### T4.5 — 护栏流水线
+### ✅ T4.5 — 护栏流水线
 
 - **目标**：串联 L1-L5，实现完整的护栏检查流水线
 - **涉及文件**：`src/guardrails/pipeline.ts`, `tests/unit/guardrails/pipeline.test.ts`
@@ -481,7 +481,7 @@
 
 ## 阶段 5：反馈收集器
 
-### T5.1 — Diff 检查器 [P]
+### ✅ T5.1 — Diff 检查器 [P]
 
 - **目标**：实现文件修改检测
 - **涉及文件**：`src/feedback/diff-tracker.ts`, `tests/unit/feedback/diff-tracker.test.ts`
@@ -497,7 +497,7 @@
   - 预期文件被修改 → 通过，标注"预期内"
   - 非预期文件被修改 → 警告
 
-### T5.2 — 测试 / Lint / 类型检查 / 构建执行器 [P]
+### ✅ T5.2 — 测试 / Lint / 类型检查 / 构建执行器 [P]
 
 - **目标**：实现四种反馈信号的执行器
 - **涉及文件**：
@@ -527,7 +527,7 @@
 
 ## 阶段 6：上下文与记忆
 
-### T6.1 — Token 计数器 [P]
+### ✅ T6.1 — Token 计数器 [P]
 
 - **目标**：实现 Token 估算与裁剪策略
 - **涉及文件**：`src/utils/token-counter.ts`, `tests/unit/utils/token-counter.test.ts`
@@ -552,7 +552,7 @@
   - 系统提示始终保留
   - 最近 2 轮对话即使超限也强制保留
 
-### T6.2 — 上下文构建器
+### ✅ T6.2 — 上下文构建器
 
 - **目标**：实现分层上下文构建，包含系统提示和防漂移注入
 - **涉及文件**：`src/core/context-builder.ts`, `tests/unit/core/context-builder.test.ts`
@@ -577,7 +577,7 @@
   - 记忆被正确加载
   - 超预算时自动裁剪
 
-### T6.3 — 记忆管理器 [P]
+### ✅ T6.3 — 记忆管理器 [P]
 
 - **目标**：实现跨会话记忆存储与检索
 - **涉及文件**：`src/memory/memory-store.ts`, `tests/unit/memory/memory-store.test.ts`
@@ -602,7 +602,7 @@
 
 ## 阶段 7：配置管理
 
-### T7.1 — 配置 Schema 定义 [P]
+### ✅ T7.1 — 配置 Schema 定义 [P]
 
 - **目标**：定义配置文件的完整 zod Schema
 - **涉及文件**：`src/config/schema.ts`, `tests/unit/config/schema.test.ts`
@@ -627,7 +627,7 @@
   - model_context_ratio 超出 0-1 → 验证失败
   - fallbacks 格式正确
 
-### T7.2 — 配置文件加载与合并
+### ✅ T7.2 — 配置文件加载与合并
 
 - **目标**：实现多层配置加载和深度合并
 - **涉及文件**：`src/config/loader.ts`, `tests/unit/config/loader.test.ts`
@@ -650,7 +650,7 @@
   - 无效 YAML 语法 → 报错
   - 旧版配置格式自动迁移
 
-### T7.3 — 价格表 [P]
+### ✅ T7.3 — 价格表 [P]
 
 - **目标**：定义 LLM 价格表（纯数据文件，豁免测试覆盖率）
 - **涉及文件**：`src/utils/pricing.ts`
@@ -665,7 +665,7 @@
   8. 未知模型返回 0
 - **验证**：纯数据文件，豁免覆盖率
 
-### T7.4 — 成本追踪器
+### ✅ T7.4 — 成本追踪器
 
 - **目标**：实现 Token 用量和成本追踪
 - **涉及文件**：`src/utils/cost-tracker.ts`, `tests/unit/utils/cost-tracker.test.ts`
@@ -686,7 +686,7 @@
 
 ## 阶段 8：CLI 层
 
-### T8.1 — 终端输出格式化 [P]
+### ✅ T8.1 — 终端输出格式化 [P]
 
 - **目标**：实现彩色分层终端输出，符合 SPEC §3.8 的 UX 设计
 - **涉及文件**：`src/cli/output.ts`, `tests/unit/cli/output.test.ts`
@@ -705,7 +705,7 @@
   - 最终结果为合法 JSON
   - 非交互模式不输出颜色
 
-### T8.2 — 首次运行向导
+### ✅ T8.2 — 首次运行向导
 
 - **目标**：实现首次运行配置向导
 - **涉及文件**：`src/cli/setup-wizard.ts`
@@ -723,7 +723,7 @@
   11. 整个流程 < 5 分钟
 - **验证**：交互式向导，通过 E2E 测试覆盖（豁免单元测试覆盖率）
 
-### T8.3 — CLI 命令实现
+### ✅ T8.3 — CLI 命令实现
 
 - **目标**：实现所有 CLI 命令和交互式审批
 - **涉及文件**：`src/cli/commands.ts`, `src/index.ts`
@@ -768,7 +768,7 @@
   - 凭据未配置 → 退出码 1
   - 中断信号 → 退出码 130
 
-### T8.4 — 版本检查与升级
+### ✅ T8.4 — 版本检查与升级
 
 - **目标**：实现版本检查和配置文件迁移
 - **涉及文件**：`src/utils/version-check.ts`, `tests/unit/utils/version-check.test.ts`
@@ -789,7 +789,7 @@
 
 ## 阶段 9：集成与演示
 
-### T9.1 — 演示①：治理护栏拦截危险动作
+### ✅ T9.1 — 演示①：治理护栏拦截危险动作
 
 - **目标**：用 mock LLM 确定性地验证护栏拦截功能
 - **涉及文件**：`tests/integration/demo1-guardrails.test.ts`, `tests/fixtures/mock-responses/demo1.json`
@@ -801,7 +801,7 @@
   2. 验证：护栏正确拦截 / 审批通过后执行 / 审计日志记录
 - **验证**：测试断言全部通过，不依赖网络
 
-### T9.2 — 演示②：反馈闭环自我修正
+### ✅ T9.2 — 演示②：反馈闭环自我修正
 
 - **目标**：用 mock LLM 验证反馈闭环的修正能力
 - **涉及文件**：`tests/integration/demo2-feedback.test.ts`, `tests/fixtures/mock-responses/demo2.json`
@@ -815,7 +815,7 @@
   3. 验证：finish 拦截器在测试通过后允许 finish
 - **验证**：测试断言全部通过，不依赖网络
 
-### T9.3 — 演示③：治理深层行为 — 五层护栏组合 + 目标漂移
+### ✅ T9.3 — 演示③：治理深层行为 — 五层护栏组合 + 目标漂移
 
 - **目标**：用 mock LLM 验证五层护栏协同工作和目标漂移检测
 - **涉及文件**：`tests/integration/demo3-governance.test.ts`, `tests/fixtures/mock-responses/demo3.json`
@@ -828,7 +828,7 @@
   6. 验证：所有场景的护栏结果、审批结果、审计日志、偏离检测结果正确
 - **验证**：测试断言全部通过，不依赖网络
 
-### T9.4 — 端到端集成测试
+### ✅ T9.4 — 端到端集成测试
 
 - **目标**：用 mock LLM 验证完整的主循环集成，覆盖所有新增功能
 - **涉及文件**：`tests/integration/e2e.test.ts`
@@ -842,7 +842,7 @@
   7. 验证成本追踪
 - **验证**：测试断言全部通过，不依赖网络
 
-### T9.5 — CLI E2E 测试
+### ✅ T9.5 — CLI E2E 测试
 
 - **目标**：CLI 端到端 happy path + 配置错误场景
 - **涉及文件**：`tests/e2e/cli.test.ts`
@@ -858,7 +858,7 @@
 
 ## 阶段 10：分发与文档
 
-### T10.1 — README.md 编写
+### ✅ T10.1 — README.md 编写
 
 - **目标**：编写完整的项目 README
 - **涉及文件**：`README.md`
@@ -875,7 +875,7 @@
   10. 已知限制
   11. 许可证
 
-### T10.2 — 分发配置
+### ✅ T10.2 — 分发配置
 
 - **目标**：配置 npm 包分发
 - **涉及文件**：`package.json`（完善 fields）
@@ -887,7 +887,7 @@
   5. 版本号 1.0.0
   6. 添加所有依赖：commander, yaml, chalk, inquirer, keytar, tiktoken, zod, uuid, pino, semver, openai, @anthropic-ai/sdk
 
-### T10.3 — CI 配置完善
+### ✅ T10.3 — CI 配置完善
 
 - **目标**：完善 CI 配置，确保自动运行测试和覆盖率检查
 - **涉及文件**：`.gitlab-ci.yml`

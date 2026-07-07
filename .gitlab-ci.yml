@@ -1,0 +1,39 @@
+stages:
+  - test
+  - lint
+
+unit-test:
+  stage: test
+  image: node:20
+  script:
+    - corepack enable
+    - corepack prepare pnpm@latest --activate
+    - pnpm install --frozen-lockfile
+    - pnpm test -- --coverage
+  parallel:
+    matrix:
+      - PLATFORM: [ubuntu-latest, macos-latest, windows-latest]
+  coverage: '/All files\s+\|\s+(\d+\.\d+)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+
+type-check:
+  stage: test
+  image: node:20
+  script:
+    - corepack enable
+    - corepack prepare pnpm@latest --activate
+    - pnpm install --frozen-lockfile
+    - npx tsc --noEmit
+
+lint:
+  stage: lint
+  image: node:20
+  script:
+    - corepack enable
+    - corepack prepare pnpm@latest --activate
+    - pnpm install --frozen-lockfile
+    - pnpm run lint
